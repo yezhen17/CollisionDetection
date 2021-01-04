@@ -30,3 +30,15 @@
 *.exe
 *.out
 *.app
+
+*.ilk
+*.pdb
+*.ipdb
+*.iobj
+
+*common/
+*includes/
+*resources/
+*packages/
+*x64/
+*.vs/
