@@ -14,7 +14,7 @@
 #include <helper_gl.h>
 
 #include "particleSystem.h"
-#include "particleSystem.cuh"
+#include "physicsEngine.cuh"
 #include "particles_kernel.cuh"
 
 #include <cuda_runtime.h>

@@ -115,6 +115,12 @@ extern "C"
         }
     }
 
+	void copyArrayFromDevice_(void *host, const void *device, int size)
+	{
+		checkCudaErrors(cudaMemcpy(host, device, size, cudaMemcpyDeviceToHost));
+		//cudaMemcpyFromSymbol(host, device, size);
+	}
+
     void setParameters(SimParams *hostParams)
     {
         // copy parameters to constant memory

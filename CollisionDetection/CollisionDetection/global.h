@@ -7,7 +7,7 @@ typedef unsigned int uint;
 #define THRESHOLD         0.30f
 
 #define GRID_SIZE       64
-#define NUM_SPHERES   16384
+#define SPHERE_NUM   16384
 
 #define WINDOW_WIDTH 800
 #define WINDOW_HEIGHT 640

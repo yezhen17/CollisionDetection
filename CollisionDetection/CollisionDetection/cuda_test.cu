@@ -1,18 +1,9 @@
 #include "cuda_runtime.h" 
 #include "cublas_v2.h" 
-#include <cooperative_groups.h>
-// namespace cg = cooperative_groups;
-
 
 
 #include <time.h> 
 #include <iostream> 
-
-//#ifdef __INTELLISENSE__
-//#include "intellisense_cuda_intrinsics.h"
-//#endif
-
-
 
 using namespace std;
 

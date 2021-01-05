@@ -16,15 +16,12 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />
-    <None Include="particleSystem.cuh" />
     <None Include="particles_kernel.cuh" />
     <None Include="particles_kernel_impl.cuh" />
+    <None Include="physicsEngine.cuh" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="glad.c">
-      <Filter>源文件</Filter>
-    </ClCompile>
-    <ClCompile Include="2.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
     <ClCompile Include="particles.cpp">
@@ -39,20 +36,23 @@
     <ClCompile Include="shaders.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
+    <ClCompile Include="main.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="demoSystem.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="physicsEngine.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <CudaCompile Include="cuda_main.cu">
+    <CudaCompile Include="cuda_test.cu">
       <Filter>源文件</Filter>
     </CudaCompile>
-    <CudaCompile Include="particleSystem_cuda.cu" />
+    <CudaCompile Include="physicsEngine_cuda.cu" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="camera.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
-    <ClInclude Include="shader_m.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
     <ClInclude Include="data.h">
       <Filter>头文件</Filter>
     </ClInclude>
@@ -69,6 +69,12 @@
       <Filter>头文件</Filter>
     </ClInclude>
     <ClInclude Include="shaders.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="demoSystem.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="physicsEngine.h">
       <Filter>头文件</Filter>
     </ClInclude>
   </ItemGroup>

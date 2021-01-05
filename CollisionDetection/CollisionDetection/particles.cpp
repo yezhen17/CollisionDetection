@@ -251,7 +251,7 @@ void display()
         psystem->setCollideAttraction(collideAttraction);
 
         psystem->update(timestep);
-
+		printf("%.6f", timestep);
         if (renderer)
         {
             renderer->setVertexBuffer(psystem->getCurrentReadBuffer(), psystem->getNumParticles());
@@ -685,7 +685,7 @@ void initMenus()
 // Program main
 ////////////////////////////////////////////////////////////////////////////////
 int
-main(int argc, char **argv)
+mai1n(int argc, char **argv)
 {
 #if defined(__linux__)
     setenv ("DISPLAY", ":0", 0);
