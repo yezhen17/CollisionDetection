@@ -10,7 +10,6 @@
 #include <learnopengl/camera.h>
 #include <stb_image.h>
 
-
 #include "data.h"
 #include "demoSystem.h"
 
@@ -212,6 +211,7 @@ void DemoSystem::mainLoop()
 		lastFrame_ = currentFrame;
 
 		printf("%.6f", deltaTime_);
+		//Sleep(200);
 		
 		// input
 		// -----
@@ -331,7 +331,7 @@ void DemoSystem::updateShader()
 void DemoSystem::updateSpherePosition(float delta_time)
 {
 	float timestep = 0.5f;
-	float damping = 1.0f;
+	float damping = 1.00f;
 	float gravity = 0.001f;//0.0003f;
 	int iterations = 1;
 	int ballr = 10;
@@ -340,6 +340,7 @@ void DemoSystem::updateSpherePosition(float delta_time)
 	float collideDamping = 0.02f;
 	float collideShear = 0.1f;
 	float collideAttraction = 0.0f;
+	float collideE = 0.05f;
 	engine_->setIterations(iterations);
 	engine_->setDamping(damping);
 	engine_->setGravity(-gravity);
@@ -347,6 +348,7 @@ void DemoSystem::updateSpherePosition(float delta_time)
 	engine_->setCollideDamping(collideDamping);
 	engine_->setCollideShear(collideShear);
 	engine_->setCollideAttraction(collideAttraction);
+	engine_->setCollideE(collideE);
 	engine_->update(timestep);
 	
 	float* updated_pos = engine_->outputPos();

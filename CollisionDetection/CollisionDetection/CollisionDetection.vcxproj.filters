@@ -24,18 +24,6 @@
     <ClCompile Include="glad.c">
       <Filter>源文件</Filter>
     </ClCompile>
-    <ClCompile Include="particles.cpp">
-      <Filter>源文件</Filter>
-    </ClCompile>
-    <ClCompile Include="particleSystem.cpp">
-      <Filter>源文件</Filter>
-    </ClCompile>
-    <ClCompile Include="render_particles.cpp">
-      <Filter>源文件</Filter>
-    </ClCompile>
-    <ClCompile Include="shaders.cpp">
-      <Filter>源文件</Filter>
-    </ClCompile>
     <ClCompile Include="main.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
@@ -62,20 +50,12 @@
     <ClInclude Include="global.h">
       <Filter>头文件</Filter>
     </ClInclude>
-    <ClInclude Include="particleSystem.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
-    <ClInclude Include="render_particles.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
-    <ClInclude Include="shaders.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
     <ClInclude Include="demoSystem.h">
       <Filter>头文件</Filter>
     </ClInclude>
     <ClInclude Include="physicsEngine.h">
       <Filter>头文件</Filter>
     </ClInclude>
+    <ClInclude Include="collision_kernel.cuh" />
   </ItemGroup>
 </Project>

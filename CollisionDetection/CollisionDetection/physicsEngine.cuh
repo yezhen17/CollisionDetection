@@ -50,14 +50,25 @@ extern "C"
                                      uint   numParticles,
                                      uint   numCells);
 
-    void collide(float *newVel,
+    /*void collide(float *newVel,
                  float *sortedPos,
                  float *sortedVel,
                  uint  *gridParticleIndex,
                  uint  *cellStart,
                  uint  *cellEnd,
                  uint   numParticles,
-                 uint   numCells);
+                 uint   numCells);*/
+
+	void collide(float *newVel,
+		float *sortedPos,
+		float *sortedVel,
+		float *radius,
+		float *mass,
+		uint  *gridParticleIndex,
+		uint  *cellStart,
+		uint  *cellEnd,
+		uint   numParticles,
+		uint   numCells);
 
     void sortParticles(uint *dGridParticleHash, uint *dGridParticleIndex, uint numParticles);
 

@@ -21,16 +21,20 @@ protected:
 protected:
 	uint sphere_num_;
 	// CPU data
-	float *m_hPos;              // particle positions
-	float *m_hVel;              // particle velocities
+	float *h_pos_;              // particle positions
+	float *h_velo_;              // particle velocities
 
-	uint  *m_hParticleHash;
-	uint  *m_hCellStart;
-	uint  *m_hCellEnd;
+	float *h_mass_;
+	float *h_rest_;
+	float *h_radius_;
+	float *h_color_;
 
 	// GPU data
-	float *pos_arr;
-	float *vel_arr;
+	float *d_pos_;        // these are the CUDA deviceMem Pos
+	float *d_velo_;
+	float *d_mass_;
+	float *d_rest_;
+	float *d_radius_;
 
 	float *m_dSortedPos;
 	float *m_dSortedVel;
@@ -48,7 +52,7 @@ protected:
 	//uint   m_posVbo;            // vertex buffer object for particle positions
 	//uint   m_colorVBO;          // vertex buffer object for colors
 
-	float *m_cudaPosVBO;        // these are the CUDA deviceMem Pos
+	
 	//float *m_cudaColorVBO;      // these are the CUDA deviceMem Color
 
 	//struct cudaGraphicsResource *m_cuda_posvbo_resource; // handles OpenGL-CUDA exchange
@@ -79,6 +83,10 @@ public:
 	void setCollideSpring(float x)
 	{
 		m_params.spring = x;
+	}
+	void setCollideE(float x)
+	{
+		m_params.e = x;
 	}
 	void setCollideDamping(float x)
 	{

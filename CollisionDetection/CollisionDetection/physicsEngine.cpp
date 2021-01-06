@@ -16,10 +16,10 @@
 #include <algorithm>
 
 PhysicsEngine::PhysicsEngine(uint sphere_num, uint grid_size): sphere_num_(sphere_num),
-m_hPos(0),
-m_hVel(0),
-pos_arr(0),
-vel_arr(0),
+h_pos_(0),
+h_velo_(0),
+d_pos_(0),
+d_velo_(0),
 m_solverIterations(1)
 {
 	m_gridSize.x = m_gridSize.y = m_gridSize.z = grid_size;
@@ -51,27 +51,35 @@ m_solverIterations(1)
 	m_params.gravity = make_float3(0.0f, -0.0003f, 0.0f);
 	m_params.globalDamping = 1.0f;
 
+	m_params.e = 0.5f;
+
 	// allocate host storage
-	m_hPos = new float[sphere_num * 4];
-	m_hVel = new float[sphere_num * 4];
-	memset(m_hPos, 0, sphere_num * 4 * sizeof(float));
-	memset(m_hVel, 0, sphere_num * 4 * sizeof(float));
-
-	m_hCellStart = new uint[m_numGridCells];
-	memset(m_hCellStart, 0, m_numGridCells * sizeof(uint));
-
-	m_hCellEnd = new uint[m_numGridCells];
-	memset(m_hCellEnd, 0, m_numGridCells * sizeof(uint));
+	uint space_1x = sizeof(float) * sphere_num;
+	uint space_3x = space_1x * 3;
+	uint space_4x = space_1x * 4;
+	
+	h_pos_ = new float[sphere_num * 4];
+	h_velo_ = new float[sphere_num * 4];
+	h_color_ = new float[sphere_num * 3];
+	h_mass_ = new float[sphere_num];
+	h_radius_ = new float[sphere_num];
+	h_rest_ = new float[sphere_num];
+	memset(h_pos_, 0, space_4x);
+	memset(h_velo_, 0, space_4x);
+	memset(h_color_, 0, space_3x);
+	memset(h_mass_, 0, space_1x);
+	memset(h_radius_, 0, space_1x);
+	memset(h_rest_, 0, space_1x);
 
 	// allocate GPU data
-	unsigned int memSize = sizeof(float) * 4 * sphere_num;
+	allocateArray((void **)&d_pos_, space_4x);
+	allocateArray((void **)&d_velo_, space_4x);
+	allocateArray((void **)&d_mass_, space_1x);
+	allocateArray((void **)&d_rest_, space_1x);
+	allocateArray((void **)&d_radius_, space_1x);
 
-	allocateArray((void **)&m_cudaPosVBO, memSize);
-
-	allocateArray((void **)&vel_arr, memSize);
-
-	allocateArray((void **)&m_dSortedPos, memSize);
-	allocateArray((void **)&m_dSortedVel, memSize);
+	allocateArray((void **)&m_dSortedPos, space_4x);
+	allocateArray((void **)&m_dSortedVel, space_4x);
 
 	allocateArray((void **)&m_dGridParticleHash, sphere_num * sizeof(uint));
 	allocateArray((void **)&m_dGridParticleIndex, sphere_num * sizeof(uint));
@@ -86,12 +94,18 @@ m_solverIterations(1)
 
 PhysicsEngine::~PhysicsEngine()
 {
-	delete[] m_hPos;
-	delete[] m_hVel;
-	delete[] m_hCellStart;
-	delete[] m_hCellEnd;
+	delete[] h_pos_;
+	delete[] h_velo_;
+	delete[] h_color_;
+	delete[] h_mass_;
+	delete[] h_radius_;
+	delete[] h_rest_;
 
-	freeArray(vel_arr);
+	freeArray(d_velo_);
+	freeArray(d_pos_);
+	freeArray(d_mass_);
+	freeArray(d_radius_);
+	freeArray(d_rest_);
 	freeArray(m_dSortedPos);
 	freeArray(m_dSortedVel);
 
@@ -99,8 +113,6 @@ PhysicsEngine::~PhysicsEngine()
 	freeArray(m_dGridParticleIndex);
 	freeArray(m_dCellStart);
 	freeArray(m_dCellEnd);
-
-	freeArray(m_cudaPosVBO);
 }
 
 void PhysicsEngine::initData()
@@ -121,43 +133,41 @@ void PhysicsEngine::initData()
 
 				if (i < sphere_num_)
 				{
-					m_hPos[i * 4] = (m_params.particleRadius*2.0f * x) + m_params.particleRadius - 1.0f + (rand() / (float)RAND_MAX*2.0f - 1.0f)*jitter;
-					m_hPos[i * 4 + 1] = (m_params.particleRadius*2.0f * y) + m_params.particleRadius - 1.0f + (rand() / (float)RAND_MAX*2.0f - 1.0f)*jitter;
-					m_hPos[i * 4 + 2] = (m_params.particleRadius*2.0f * z) + m_params.particleRadius - 1.0f + (rand() / (float)RAND_MAX*2.0f - 1.0f)*jitter;
-					m_hPos[i * 4 + 3] = 1.0f;
+					h_pos_[i * 4] = (m_params.particleRadius*2.0f * x) + m_params.particleRadius - 1.0f + (rand() / (float)RAND_MAX*2.0f - 1.0f)*jitter;
+					h_pos_[i * 4 + 1] = (m_params.particleRadius*2.0f * y) + m_params.particleRadius - 1.0f + (rand() / (float)RAND_MAX*2.0f - 1.0f)*jitter;
+					h_pos_[i * 4 + 2] = (m_params.particleRadius*2.0f * z) + m_params.particleRadius - 1.0f + (rand() / (float)RAND_MAX*2.0f - 1.0f)*jitter;
+					h_pos_[i * 4 + 3] = 1.0f;
 
-					m_hVel[i * 4] = 0.0f;
-					m_hVel[i * 4 + 1] = 0.0f;
-					m_hVel[i * 4 + 2] = 0.0f;
-					m_hVel[i * 4 + 3] = 0.0f;
+					h_velo_[i * 4] = 0.0f;
+					h_velo_[i * 4 + 1] = 0.0f;
+					h_velo_[i * 4 + 2] = 0.0f;
+					h_velo_[i * 4 + 3] = 0.0f;
 				}
 			}
 		}
 	}
-	copyArrayToDevice(m_cudaPosVBO, m_hPos,0, sphere_num_ * 4 * sizeof(float));
-	copyArrayToDevice(vel_arr, m_hVel, 0, sphere_num_ * 4 * sizeof(float));
+	copyArrayToDevice(d_pos_, h_pos_,0, sphere_num_ * 4 * sizeof(float));
+	copyArrayToDevice(d_velo_, h_velo_, 0, sphere_num_ * 4 * sizeof(float));
 }
 
 float * PhysicsEngine::outputPos()
 {
 	//threadSync();
-	copyArrayFromDevice_(m_hPos, m_cudaPosVBO, sizeof(float) * 4 *sphere_num_);
-	// checkCudaErrors(cudaMemcpy(m_hPos, m_cudaPosVBO, sizeof(float) * 4 * sphere_num_, cudaMemcpyDeviceToHost));
-	return m_hPos;
+	copyArrayFromDevice_(h_pos_, d_pos_, sizeof(float) * 4 *sphere_num_);
+	// checkCudaErrors(cudaMemcpy(h_pos_, d_pos_, sizeof(float) * 4 * sphere_num_, cudaMemcpyDeviceToHost));
+	return h_pos_;
 }
 
 void PhysicsEngine::update(float deltaTime)
 {
 	
-	float *dPos = (float *) m_cudaPosVBO;
-
 	// update constants
 	setParameters(&m_params);
 
 	// integrate
 	integrateSystem(
-		dPos,
-		vel_arr,
+		d_pos_,
+		d_velo_,
 		deltaTime,
 		sphere_num_);
 
@@ -165,7 +175,7 @@ void PhysicsEngine::update(float deltaTime)
 	calcHash(
 		m_dGridParticleHash,
 		m_dGridParticleIndex,
-		dPos,
+		d_pos_,
 		sphere_num_);
 
 	// sort particles based on hash
@@ -180,16 +190,18 @@ void PhysicsEngine::update(float deltaTime)
 		m_dSortedVel,
 		m_dGridParticleHash,
 		m_dGridParticleIndex,
-		dPos,
-		vel_arr,
+		d_pos_,
+		d_velo_,
 		sphere_num_,
 		m_numGridCells);
 
 	// process collisions
 	collide(
-		vel_arr,
+		d_velo_,
 		m_dSortedPos,
 		m_dSortedVel,
+		d_radius_,
+		d_mass_,
 		m_dGridParticleIndex,
 		m_dCellStart,
 		m_dCellEnd,

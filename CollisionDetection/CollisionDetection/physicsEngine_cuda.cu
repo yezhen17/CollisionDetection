@@ -213,9 +213,15 @@ extern "C"
 #endif
     }
 
+	//void collide(float * newVel, float * sortedPos, float * sortedVel, uint * gridParticleIndex, uint * cellStart, uint * cellEnd, uint numParticles, uint numCells)
+	//{
+	//}
+
     void collide(float *newVel,
                  float *sortedPos,
                  float *sortedVel,
+		         float *radius,
+		float *mass,
                  uint  *gridParticleIndex,
                  uint  *cellStart,
                  uint  *cellEnd,
@@ -237,6 +243,7 @@ extern "C"
         collideD<<< numBlocks, numThreads >>>((float4 *)newVel,
                                               (float4 *)sortedPos,
                                               (float4 *)sortedVel,
+			radius, mass,
                                               gridParticleIndex,
                                               cellStart,
                                               cellEnd,

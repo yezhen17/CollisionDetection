@@ -158,11 +158,7 @@
     <ClCompile Include="demoSystem.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="glad.c" />
-    <ClCompile Include="particles.cpp" />
-    <ClCompile Include="particleSystem.cpp" />
     <ClCompile Include="physicsEngine.cpp" />
-    <ClCompile Include="render_particles.cpp" />
-    <ClCompile Include="shaders.cpp" />
   </ItemGroup>
   <ItemGroup>
     <CudaCompile Include="cuda_test.cu">
@@ -176,16 +172,14 @@
     </CudaCompile>
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="collision_kernel.cuh" />
     <ClInclude Include="data.h" />
     <ClInclude Include="demoSystem.h" />
     <ClInclude Include="global.h" />
     <None Include="physicsEngine.cuh" />
     <None Include="particles_kernel.cuh" />
     <None Include="particles_kernel_impl.cuh" />
-    <ClInclude Include="particleSystem.h" />
     <ClInclude Include="physicsEngine.h" />
-    <ClInclude Include="render_particles.h" />
-    <ClInclude Include="shaders.h" />
     <ClInclude Include="sphere.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
