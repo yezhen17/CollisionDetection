@@ -17,22 +17,20 @@
 typedef unsigned int uint;
 
 // simulation parameters
-struct SimParams
+struct SimulationEnv
 {
 	uint3 grid_exp;
-    float3 colliderPos;
-    float  colliderRadius;
 
     float3 gravity;
     float globalDamping;
-    float particleRadius;
+    float max_radius;
 
     uint3 gridSize;
-    uint numCells;
+    uint cell_num;
     float3 worldOrigin;
     float3 cellSize;
 
-    uint numBodies;
+    uint sphere_num;
     uint maxParticlesPerCell;
 
     float spring;

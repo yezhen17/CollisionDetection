@@ -32,6 +32,7 @@ protected:
 	// GPU data
 	float *d_pos_;        // these are the CUDA deviceMem Pos
 	float *d_velo_;
+	float *d_velo_delta_;
 	float *d_mass_;
 	float *d_rest_;
 	float *d_radius_;
@@ -58,11 +59,11 @@ protected:
 	//struct cudaGraphicsResource *m_cuda_posvbo_resource; // handles OpenGL-CUDA exchange
 	//struct cudaGraphicsResource *m_cuda_colorvbo_resource; // handles OpenGL-CUDA exchange
 
-	// params
-	SimParams m_params;
+	// env
+	SimulationEnv m_params;
 	uint3 m_gridSize;
 	uint3 grid_exp_;
-	uint m_numGridCells;
+	uint cell_num_;
 
 
 public:
@@ -95,11 +96,6 @@ public:
 	void setCollideAttraction(float x)
 	{
 		m_params.attraction = x;
-	}
-
-	void setColliderPos(float3 x)
-	{
-		m_params.colliderPos = x;
 	}
 
 	float *getSphereRadius()

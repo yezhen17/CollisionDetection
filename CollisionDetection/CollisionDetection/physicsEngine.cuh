@@ -21,22 +21,13 @@ extern "C"
 	void copyArrayFromDevice(void *host, const void *device, int size);
     void copyArrayToDevice(void *device, const void *host, int offset, int size);
 
-    void setParameters(SimParams *hostParams);
+    void dSetupSimulation(SimulationEnv *hostParams);
 
-    void update_dynamics(float *pos, float *velo, float *radius, float elapse, uint sphere_num);
+    void dUpdateDynamics(float *pos, float *velo, float *velo_delta, float *radius, float elapse, uint sphere_num);
 
-    void calcHash(uint *hash, uint *index, float *pos, uint sphere_num);
+    void dHashifyAndSort(uint *hashes, uint *indices, float *pos, uint sphere_num);
 
-    void reorderDataAndFindCellStart(uint  *cellStart,
-                                     uint  *cellEnd,
-                                     float *sortedPos,
-                                     float *sortedVel,
-                                     uint  *gridParticleHash,
-                                     uint  *gridParticleIndex,
-                                     float *oldPos,
-                                     float *oldVel,
-                                     uint   numParticles,
-                                     uint   numCells);
+    void dCollectCells(uint *cellStart,uint *cellEnd, uint *hashes, uint sphere_num, uint cell_num);
 
     /*void collide(float *newVel,
                  float *sortedPos,
@@ -45,7 +36,7 @@ extern "C"
                  uint  *cellStart,
                  uint  *cellEnd,
                  uint   numParticles,
-                 uint   numCells);*/
+                 uint   cell_num);*/
 
 	void collide(float *newVel,
 		float *sortedPos,
@@ -56,8 +47,5 @@ extern "C"
 		uint  *cellStart,
 		uint  *cellEnd,
 		uint   numParticles,
-		uint   numCells);
-
-    void radixSortByHash(uint *dGridParticleHash, uint *dGridParticleIndex, uint numParticles);
-
+		uint   cell_num);
 }

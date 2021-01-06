@@ -79,10 +79,10 @@ extern "C"
 		//cudaMemcpyFromSymbol(host, device, size);
 	}
 
-    void setParameters(SimParams *hostParams)
+    void dSetupSimulation(SimulationEnv *hostParams)
     {
         // copy parameters to constant memory
-        checkCudaErrors(cudaMemcpyToSymbol(params, hostParams, sizeof(SimParams)));
+        checkCudaErrors(cudaMemcpyToSymbol(env, hostParams, sizeof(SimulationEnv)));
     }
 
     //Round a / b to nearest higher integer value
@@ -98,7 +98,7 @@ extern "C"
         numBlocks = iDivUp(n, numThreads);
     }
 
-    void update_dynamics(float *pos, float *velo, float *radius, float elapse, uint sphere_num)
+    void dUpdateDynamics(float *pos, float *velo, float *velo_delta, float *radius, float elapse, uint sphere_num)
     {
         /*thrust::device_ptr<float4> d_pos4((float4 *)pos);
         thrust::device_ptr<float4> d_vel4((float4 *)vel);
@@ -109,60 +109,61 @@ extern "C"
             integrate_functor(deltaTime));*/
 		uint numThreads, numBlocks;
 		computeGridSize(sphere_num, 256, numBlocks, numThreads);
-		update_dynamics<<< numBlocks, numThreads >>>(
+		updateDynamicsKernel <<< numBlocks, numThreads >>> (
 			(float3 *) pos, 
-			(float3 *) velo, 
+			(float3 *) velo,
+			(float3 *) velo_delta,
 			radius, 
 			elapse, 
 			sphere_num);
 		getLastCudaError("Kernel execution failed");
     }
 
-    void calcHash(uint  *hash, uint  *index, float *pos, uint sphere_num)
+    void dHashifyAndSort(
+		uint  *hashes, 
+		uint  *indices, 
+		float *pos, 
+		uint sphere_num)
     {
         uint numThreads, numBlocks;
         computeGridSize(sphere_num, 256, numBlocks, numThreads);
-        calcHashD<<< numBlocks, numThreads >>>(
-			hash,
-			index,
+		
+		// parallel calculate the hash value of every sphere
+		hashifyKernel <<< numBlocks, numThreads >>> (
+			hashes,
+			indices,
 			(float3 *) pos,
 			sphere_num);
 
-        // check if kernel invocation generated an error
-        getLastCudaError("Kernel execution failed");
+		getLastCudaError("Hashify kernel execution failure!");
+
+		// use thrust radix sort to sort the hashes
+		thrust::sort_by_key(
+			thrust::device_ptr<uint>(hashes),
+			thrust::device_ptr<uint>(hashes + sphere_num),
+			thrust::device_ptr<uint>(indices));
     }
 
-    void reorderDataAndFindCellStart(uint  *cellStart,
-                                     uint  *cellEnd,
-                                     float *pos_sorted,
-                                     float *velo_sorted,
-                                     uint  *hash,
-                                     uint  *index,
-                                     float *oldPos,
-                                     float *oldVel,
-                                     uint   numParticles,
-                                     uint   numCells)
+    void dCollectCells(
+		uint *cellStart,
+		uint *cellEnd,
+		uint *hash,
+		uint sphere_num,
+		uint cell_num)
     {
         uint numThreads, numBlocks;
-        computeGridSize(numParticles, 256, numBlocks, numThreads);
+        computeGridSize(sphere_num, 256, numBlocks, numThreads);
 
         // set all cells to empty
-        checkCudaErrors(cudaMemset(cellStart, 0xffffffff, numCells*sizeof(uint)));
-        reorderDataAndFindCellStartD<<< numBlocks, numThreads >>>(
+        checkCudaErrors(cudaMemset(cellStart, 0xffffffff, cell_num *sizeof(uint)));
+        collectCellsKernel <<< numBlocks, numThreads >>>(
             cellStart,
             cellEnd,
-            (float3 *) pos_sorted,
-            (float3 *)velo_sorted,
-            hash,
-            index,
-            (float3 *) oldPos,
-            (float3 *) oldVel,
-            numParticles);
-        getLastCudaError("Kernel execution failed: reorderDataAndFindCellStartD");
-
+            hash);
+        getLastCudaError("Kernel execution failed: collectCells");
     }
 
-    void collide(float *newVel,
+    void collide(float *velo_delta,
                  float *pos_sorted,
                  float *velo_sorted,
 		         float *radius,
@@ -171,7 +172,7 @@ extern "C"
                  uint  *cellStart,
                  uint  *cellEnd,
                  uint   numParticles,
-                 uint   numCells)
+                 uint   cell_num)
     {
 
         // thread per particle
@@ -179,9 +180,10 @@ extern "C"
         computeGridSize(numParticles, 64, numBlocks, numThreads);
 
         // execute the kernel
-        collideD<<< numBlocks, numThreads >>>((float3 *)newVel,
-                                              (float3 *)pos_sorted,
-                                              (float3 *)velo_sorted,
+        collideD<<< numBlocks, numThreads >>>(
+			(float3 *)velo_delta,
+			(float3 *)pos_sorted,
+			(float3 *)velo_sorted,
 			radius, mass,
                                               gridParticleIndex,
                                               cellStart,
@@ -191,14 +193,6 @@ extern "C"
         // check if kernel invocation generated an error
         getLastCudaError("Kernel execution failed");
 
-    }
-
-
-    void radixSortByHash(uint *dGridParticleHash, uint *dGridParticleIndex, uint numParticles)
-    {
-        thrust::sort_by_key(thrust::device_ptr<uint>(dGridParticleHash),
-                            thrust::device_ptr<uint>(dGridParticleHash + numParticles),
-                            thrust::device_ptr<uint>(dGridParticleIndex));
     }
 
 }   // extern "C"

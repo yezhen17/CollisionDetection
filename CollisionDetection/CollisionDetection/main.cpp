@@ -12,7 +12,6 @@
 
 #include "demoSystem.h"
 #include <iostream>
-#include "particleSystem.h"
 
 // CUDA runtime
 #include <cuda_runtime.h>
