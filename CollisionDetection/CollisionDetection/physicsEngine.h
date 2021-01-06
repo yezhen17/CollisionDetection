@@ -37,30 +37,16 @@ protected:
 	float *d_rest_;
 	float *d_radius_;
 
-	float *d_pos_sorted_;
-	float *d_velo_sorted_;
 
 	// grid data for sorting method
 	uint  *d_hash_; // grid hash value for each particle
-	uint  *d_index_;// particle index for each particle
-	uint  *m_dCellStart;        // index of start of each cell in sorted list
-	uint  *m_dCellEnd;          // index of end of cell
-
-	
+	uint  *d_index_sorted_;// particle index for each particle
+	uint  *d_cell_start_;        // index of start of each cell in sorted list
+	uint  *d_cell_end_;          // index of end of cell
 
 	uint   m_gridSortBits;
 
-	//uint   m_posVbo;            // vertex buffer object for particle positions
-	//uint   m_colorVBO;          // vertex buffer object for colors
-
-	
-	//float *m_cudaColorVBO;      // these are the CUDA deviceMem Color
-
-	//struct cudaGraphicsResource *m_cuda_posvbo_resource; // handles OpenGL-CUDA exchange
-	//struct cudaGraphicsResource *m_cuda_colorvbo_resource; // handles OpenGL-CUDA exchange
-
-	// env
-	SimulationEnv m_params;
+	SimulationEnv env_;
 	uint3 m_gridSize;
 	uint3 grid_exp_;
 	uint cell_num_;
@@ -68,34 +54,34 @@ protected:
 
 public:
 
-	void setDamping(float x)
+	void setDrag(float x)
 	{
-		m_params.globalDamping = x;
+		env_.drag = x;
 	}
 	void setGravity(float x)
 	{
-		m_params.gravity = make_float3(0.0f, x, 0.0f);
+		env_.gravity = make_float3(0.0f, x, 0.0f);
 	}
 
 	void setCollideSpring(float x)
 	{
-		m_params.spring = x;
+		env_.spring = x;
 	}
 	void setCollideE(float x)
 	{
-		m_params.e = x;
+		env_.e = x;
 	}
 	void setCollideDamping(float x)
 	{
-		m_params.damping = x;
+		env_.damping = x;
+	}
+	void setBoundaryDamping(float x)
+	{
+		env_.boundary_damping = x;
 	}
 	void setCollideShear(float x)
 	{
-		m_params.shear = x;
-	}
-	void setCollideAttraction(float x)
-	{
-		m_params.attraction = x;
+		env_.shear = x;
 	}
 
 	float *getSphereRadius()

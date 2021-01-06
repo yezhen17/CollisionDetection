@@ -22,22 +22,20 @@ struct SimulationEnv
 	uint3 grid_exp;
 
     float3 gravity;
-    float globalDamping;
+    float drag;
     float max_radius;
 
-    uint3 gridSize;
+    uint3 grid_size;
     uint cell_num;
     float3 worldOrigin;
-    float3 cellSize;
+    float3 cell_size;
 
     uint sphere_num;
-    uint maxParticlesPerCell;
 
     float spring;
     float damping;
     float shear;
-    float attraction;
-    float boundaryDamping;
+    float boundary_damping;
 
 	float e;
 };

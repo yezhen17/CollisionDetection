@@ -17,21 +17,18 @@ DemoSystem::DemoSystem()
 {
 	engine_ = new PhysicsEngine();
 	sphere_num_ = SPHERE_NUM;
-	float timestep = 0.5f;
+	/*float timestep = 0.5f;
 	float damping = 1.0f;
 	float gravity = 0.0003f;
-	int ballr = 10;
 
 	float collideSpring = 0.5f;;
 	float collideDamping = 0.02f;;
 	float collideShear = 0.1f;
-	float collideAttraction = 0.0f;
-	engine_->setDamping(damping);
+	engine_->setDrag(damping);
 	engine_->setGravity(-gravity);
 	engine_->setCollideSpring(collideSpring);
 	engine_->setCollideDamping(collideDamping);
-	engine_->setCollideShear(collideShear);
-	engine_->setCollideAttraction(collideAttraction);
+	engine_->setCollideShear(collideShear);*/
 }
 
 DemoSystem::~DemoSystem()
@@ -329,22 +326,19 @@ void DemoSystem::updateShader()
 void DemoSystem::updateSpherePosition(float delta_time)
 {
 	float timestep = 0.1f;//0.5f
-	float damping = 0.999f;
-	float gravity = 0.05f;//0.001f;
-	int ballr = 10;
+	//float damping = 0.999f;
+	//float gravity = 0.05f;//0.001f;
 
-	float collideSpring = 2.5f;//0.5f;
-	float collideDamping = 0.02f;
-	float collideShear = 0.1f;
-	float collideAttraction = 0.0f;
-	float collideE = 0.2f;
-	engine_->setDamping(damping);
-	engine_->setGravity(-gravity);
-	engine_->setCollideSpring(collideSpring);
-	engine_->setCollideDamping(collideDamping);
-	engine_->setCollideShear(collideShear);
-	engine_->setCollideAttraction(collideAttraction);
-	engine_->setCollideE(collideE);
+	//float collideSpring = 2.5f;//0.5f;
+	//float collideDamping = 0.02f;
+	//float collideShear = 0.1f;
+	//float collideE = 0.2f;
+	//engine_->setDrag(damping);
+	//engine_->setGravity(-gravity);
+	//engine_->setCollideSpring(collideSpring);
+	//engine_->setCollideDamping(collideDamping);
+	//engine_->setCollideShear(collideShear);
+	//engine_->setCollideE(collideE);
 	engine_->update(timestep);
 	
 	float* updated_pos = engine_->outputPos();

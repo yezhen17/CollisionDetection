@@ -12,33 +12,20 @@
 // This file contains C wrappers around the some of the CUDA API and the
 // kernel functions so that they can be called from "particleSystem.cpp"
 
-#if defined(__APPLE__) || defined(MACOSX)
-#pragma clang diagnostic ignored "-Wdeprecated-declarations"
-#include <GLUT/glut.h>
-#else
-#include <GL/freeglut.h>
-#endif
-
 #include <cstdlib>
 #include <cstdio>
 #include <string.h>
 
 #include <cuda_runtime.h>
-#include <cuda_gl_interop.h>
-
 #include <helper_cuda.h>
-
 #include <helper_functions.h>
 #include "thrust/device_ptr.h"
-#include "thrust/for_each.h"
-#include "thrust/iterator/zip_iterator.h"
 #include "thrust/sort.h"
 
 #include "particles_kernel_impl.cuh"
 
 extern "C"
 {
-
     void cudaInit(int argc, char **argv)
     {
         int devID;
@@ -53,10 +40,15 @@ extern "C"
         }
     }
 
-    void allocateArray(void **devPtr, size_t size)
+    void allocateArray(void **devPtr, uint size)
     {
         checkCudaErrors(cudaMalloc(devPtr, size));
     }
+
+	void zeroizeArray(void *devPtr, uint size)
+	{
+		checkCudaErrors(cudaMemset(devPtr, 0x0, size));
+	}
 
     void freeArray(void *devPtr)
     {
@@ -79,10 +71,10 @@ extern "C"
 		//cudaMemcpyFromSymbol(host, device, size);
 	}
 
-    void dSetupSimulation(SimulationEnv *hostParams)
+    void dSetupSimulation(SimulationEnv *h_env)
     {
         // copy parameters to constant memory
-        checkCudaErrors(cudaMemcpyToSymbol(env, hostParams, sizeof(SimulationEnv)));
+        checkCudaErrors(cudaMemcpyToSymbol(d_env, h_env, sizeof(SimulationEnv)));
     }
 
     //Round a / b to nearest higher integer value
@@ -98,24 +90,25 @@ extern "C"
         numBlocks = iDivUp(n, numThreads);
     }
 
-    void dUpdateDynamics(float *pos, float *velo, float *velo_delta, float *radius, float elapse, uint sphere_num)
+    void dUpdateDynamics(
+		float *pos, 
+		float *velo, 
+		float *velo_delta, 
+		float *radius,
+		float elapse, 
+		uint sphere_num)
     {
-        /*thrust::device_ptr<float4> d_pos4((float4 *)pos);
-        thrust::device_ptr<float4> d_vel4((float4 *)vel);
-
-        thrust::for_each(
-            thrust::make_zip_iterator(thrust::make_tuple(d_pos4, d_vel4)),
-            thrust::make_zip_iterator(thrust::make_tuple(d_pos4+numParticles, d_vel4+numParticles)),
-            integrate_functor(deltaTime));*/
 		uint numThreads, numBlocks;
 		computeGridSize(sphere_num, 256, numBlocks, numThreads);
+
+		// parallelly update the position and velocity of each sphere
 		updateDynamicsKernel <<< numBlocks, numThreads >>> (
 			(float3 *) pos, 
 			(float3 *) velo,
 			(float3 *) velo_delta,
 			radius, 
-			elapse, 
-			sphere_num);
+			elapse);
+
 		getLastCudaError("Kernel execution failed");
     }
 
@@ -128,14 +121,13 @@ extern "C"
         uint numThreads, numBlocks;
         computeGridSize(sphere_num, 256, numBlocks, numThreads);
 		
-		// parallel calculate the hash value of every sphere
+		// parallelly calculate the hash value of every sphere
 		hashifyKernel <<< numBlocks, numThreads >>> (
 			hashes,
 			indices,
-			(float3 *) pos,
-			sphere_num);
+			(float3 *) pos);
 
-		getLastCudaError("Hashify kernel execution failure!");
+		getLastCudaError("Kernel execution failed: hashify");
 
 		// use thrust radix sort to sort the hashes
 		thrust::sort_by_key(
@@ -145,8 +137,8 @@ extern "C"
     }
 
     void dCollectCells(
-		uint *cellStart,
-		uint *cellEnd,
+		uint *cell_start,
+		uint *cell_end,
 		uint *hash,
 		uint sphere_num,
 		uint cell_num)
@@ -155,44 +147,46 @@ extern "C"
         computeGridSize(sphere_num, 256, numBlocks, numThreads);
 
         // set all cells to empty
-        checkCudaErrors(cudaMemset(cellStart, 0xffffffff, cell_num *sizeof(uint)));
+        checkCudaErrors(cudaMemset(cell_start, 0xffffffff, cell_num *sizeof(uint)));
+
+		// parallelly find out all the locations where a cell starts or ends
         collectCellsKernel <<< numBlocks, numThreads >>>(
-            cellStart,
-            cellEnd,
+            cell_start,
+            cell_end,
             hash);
+
         getLastCudaError("Kernel execution failed: collectCells");
     }
 
-    void collide(float *velo_delta,
-                 float *pos_sorted,
-                 float *velo_sorted,
-		         float *radius,
+    void dNarrowPhaseCollisionDetection(
+		float *velo_delta,
+		float *pos,
+		float *velo,
+		float *radius,
 		float *mass,
-                 uint  *gridParticleIndex,
-                 uint  *cellStart,
-                 uint  *cellEnd,
-                 uint   numParticles,
-                 uint   cell_num)
+		float *rest,
+		uint  *indices_sorted,
+		uint  *cell_start,
+		uint  *cell_end,
+		uint   sphere_num)
     {
-
-        // thread per particle
         uint numThreads, numBlocks;
-        computeGridSize(numParticles, 64, numBlocks, numThreads);
+        computeGridSize(sphere_num, 64, numBlocks, numThreads);
 
         // execute the kernel
-        collideD<<< numBlocks, numThreads >>>(
-			(float3 *)velo_delta,
-			(float3 *)pos_sorted,
-			(float3 *)velo_sorted,
-			radius, mass,
-                                              gridParticleIndex,
-                                              cellStart,
-                                              cellEnd,
-                                              numParticles);
+		collisionKernel <<< numBlocks, numThreads >>> (
+			(float3 *) velo_delta,
+			(float3 *) pos,
+			(float3 *) velo,
+			radius, 
+			mass,
+			rest,
+			indices_sorted,
+			cell_start,
+			cell_end);
 
         // check if kernel invocation generated an error
         getLastCudaError("Kernel execution failed");
-
     }
 
 }   // extern "C"

@@ -13,7 +13,8 @@ extern "C"
 {
     void cudaInit(int argc, char **argv);
 
-    void allocateArray(void **devPtr, int size);
+    void allocateArray(void **devPtr, uint size);
+	void zeroizeArray(void *devPtr, uint size);
     void freeArray(void *devPtr);
 
     void threadSync();
@@ -22,30 +23,9 @@ extern "C"
     void copyArrayToDevice(void *device, const void *host, int offset, int size);
 
     void dSetupSimulation(SimulationEnv *hostParams);
-
     void dUpdateDynamics(float *pos, float *velo, float *velo_delta, float *radius, float elapse, uint sphere_num);
-
     void dHashifyAndSort(uint *hashes, uint *indices, float *pos, uint sphere_num);
-
-    void dCollectCells(uint *cellStart,uint *cellEnd, uint *hashes, uint sphere_num, uint cell_num);
-
-    /*void collide(float *newVel,
-                 float *sortedPos,
-                 float *sortedVel,
-                 uint  *gridParticleIndex,
-                 uint  *cellStart,
-                 uint  *cellEnd,
-                 uint   numParticles,
-                 uint   cell_num);*/
-
-	void collide(float *newVel,
-		float *sortedPos,
-		float *sortedVel,
-		float *radius,
-		float *mass,
-		uint  *gridParticleIndex,
-		uint  *cellStart,
-		uint  *cellEnd,
-		uint   numParticles,
-		uint   cell_num);
+    void dCollectCells(uint *cell_start, uint *cell_end, uint *hashes, uint sphere_num, uint cell_num);
+	void dNarrowPhaseCollisionDetection(float *velo_delta_s, float *pos_s, float *velo_s, float *radii,
+		float *masses, float *rest_s, uint *indices_sorted, uint *cell_start, uint *cell_end, uint sphere_num);
 }
