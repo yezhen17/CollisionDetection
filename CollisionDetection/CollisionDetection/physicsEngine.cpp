@@ -15,27 +15,32 @@
 #include <cstdlib>
 #include <algorithm>
 
+#include "sphere.h"
+
 PhysicsEngine::PhysicsEngine(uint sphere_num, uint grid_size): sphere_num_(sphere_num),
 h_pos_(0),
 h_velo_(0),
 d_pos_(0),
-d_velo_(0),
-m_solverIterations(1)
+d_velo_(0)
 {
+	grid_exp_.x = grid_exp_.y = grid_exp_.z = ceil(log2(grid_size));
+	printf("%d", grid_exp_.x);
+	m_params.grid_exp = grid_exp_;
+	// grid_size = 20;
 	m_gridSize.x = m_gridSize.y = m_gridSize.z = grid_size;
 
 	m_numGridCells = m_gridSize.x*m_gridSize.y*m_gridSize.z;
 	//    float3 worldSize = make_float3(2.0f, 2.0f, 2.0f);
 
-	m_gridSortBits = 18;    // increase this for larger grids
+	m_gridSortBits = 24;    // increase this for larger grids
 	// set simulation parameters
 	m_params.gridSize = m_gridSize;
 	m_params.numCells = m_numGridCells;
 	m_params.numBodies = sphere_num;
 
-	m_params.particleRadius = 1.0f / 64.0f;
-	m_params.colliderPos = make_float3(-1.2f, -0.8f, 0.8f);
-	m_params.colliderRadius = 0.2f;
+	m_params.particleRadius = 1.0f / 20.0f;
+	//m_params.colliderPos = make_float3(-1.2f, -0.8f, 0.8f);
+	//m_params.colliderRadius = 0.2f;
 
 	m_params.worldOrigin = make_float3(-1.0f, -1.0f, -1.0f);
 	//    m_params.cellSize = make_float3(worldSize.x / m_gridSize.x, worldSize.y / m_gridSize.y, worldSize.z / m_gridSize.z);
@@ -58,31 +63,35 @@ m_solverIterations(1)
 	uint space_3x = space_1x * 3;
 	uint space_4x = space_1x * 4;
 	
-	h_pos_ = new float[sphere_num * 4];
-	h_velo_ = new float[sphere_num * 4];
+	h_pos_ = new float[sphere_num * 3];
+	h_velo_ = new float[sphere_num * 3];
 	h_color_ = new float[sphere_num * 3];
 	h_mass_ = new float[sphere_num];
 	h_radius_ = new float[sphere_num];
 	h_rest_ = new float[sphere_num];
-	memset(h_pos_, 0, space_4x);
-	memset(h_velo_, 0, space_4x);
+	memset(h_pos_, 0, space_3x);
+	memset(h_velo_, 0, space_3x);
 	memset(h_color_, 0, space_3x);
-	memset(h_mass_, 0, space_1x);
-	memset(h_radius_, 0, space_1x);
+	/*for (uint i = 0; i < sphere_num; i++) 
+	{
+		h_mass_[i] = 1.0f;
+		h_radius_[i] = m_params.particleRadius;
+	}
+	printf("%f, %f", h_mass_[0], h_radius_[0]);*/
 	memset(h_rest_, 0, space_1x);
 
 	// allocate GPU data
-	allocateArray((void **)&d_pos_, space_4x);
-	allocateArray((void **)&d_velo_, space_4x);
+	allocateArray((void **)&d_pos_, space_3x);
+	allocateArray((void **)&d_velo_, space_3x);
 	allocateArray((void **)&d_mass_, space_1x);
 	allocateArray((void **)&d_rest_, space_1x);
 	allocateArray((void **)&d_radius_, space_1x);
 
-	allocateArray((void **)&m_dSortedPos, space_4x);
-	allocateArray((void **)&m_dSortedVel, space_4x);
+	allocateArray((void **)&d_pos_sorted_, space_3x);
+	allocateArray((void **)&d_velo_sorted_, space_3x);
 
-	allocateArray((void **)&m_dGridParticleHash, sphere_num * sizeof(uint));
-	allocateArray((void **)&m_dGridParticleIndex, sphere_num * sizeof(uint));
+	allocateArray((void **)&d_hash_, sphere_num * sizeof(uint));
+	allocateArray((void **)&d_index_, sphere_num * sizeof(uint));
 
 	allocateArray((void **)&m_dCellStart, m_numGridCells * sizeof(uint));
 	allocateArray((void **)&m_dCellEnd, m_numGridCells * sizeof(uint));
@@ -106,11 +115,11 @@ PhysicsEngine::~PhysicsEngine()
 	freeArray(d_mass_);
 	freeArray(d_radius_);
 	freeArray(d_rest_);
-	freeArray(m_dSortedPos);
-	freeArray(m_dSortedVel);
+	freeArray(d_pos_sorted_);
+	freeArray(d_velo_sorted_);
 
-	freeArray(m_dGridParticleHash);
-	freeArray(m_dGridParticleIndex);
+	freeArray(d_hash_);
+	freeArray(d_index_);
 	freeArray(m_dCellStart);
 	freeArray(m_dCellEnd);
 }
@@ -133,63 +142,80 @@ void PhysicsEngine::initData()
 
 				if (i < sphere_num_)
 				{
-					h_pos_[i * 4] = (m_params.particleRadius*2.0f * x) + m_params.particleRadius - 1.0f + (rand() / (float)RAND_MAX*2.0f - 1.0f)*jitter;
-					h_pos_[i * 4 + 1] = (m_params.particleRadius*2.0f * y) + m_params.particleRadius - 1.0f + (rand() / (float)RAND_MAX*2.0f - 1.0f)*jitter;
-					h_pos_[i * 4 + 2] = (m_params.particleRadius*2.0f * z) + m_params.particleRadius - 1.0f + (rand() / (float)RAND_MAX*2.0f - 1.0f)*jitter;
-					h_pos_[i * 4 + 3] = 1.0f;
+					h_pos_[i * 3] = (m_params.particleRadius*2.0f * x) + m_params.particleRadius - 1.0f + (rand() / (float)RAND_MAX*2.0f - 1.0f)*jitter;
+					h_pos_[i * 3 + 1] = (m_params.particleRadius*2.0f * y) + m_params.particleRadius - 1.0f + (rand() / (float)RAND_MAX*2.0f - 1.0f)*jitter;
+					h_pos_[i * 3 + 2] = (m_params.particleRadius*2.0f * z) + m_params.particleRadius - 1.0f + (rand() / (float)RAND_MAX*2.0f - 1.0f)*jitter;
+					//h_pos_[i * 3 + 3] = 1.0f;
 
-					h_velo_[i * 4] = 0.0f;
-					h_velo_[i * 4 + 1] = 0.0f;
-					h_velo_[i * 4 + 2] = 0.0f;
-					h_velo_[i * 4 + 3] = 0.0f;
+					h_velo_[i * 3] = 0.0f;
+					h_velo_[i * 3 + 1] = 0.0f;
+					h_velo_[i * 3 + 2] = 0.0f;
+					//h_velo_[i * 3 + 3] = 0.0f;
+
+					uint prototype_id = rand() % PROTOTYPE_NUM;
+					Sphere prototype = PROTOTYPES[prototype_id];
+					h_color_[i * 3] = prototype.r_;
+					h_color_[i * 3 + 1] = prototype.g_;
+					h_color_[i * 3 + 2] = prototype.b_;
+					h_mass_[i] = prototype.mass_;
+					h_radius_[i] = prototype.radius_;
+					h_rest_[i] = prototype.rest_;
+
+
 				}
 			}
 		}
 	}
-	copyArrayToDevice(d_pos_, h_pos_,0, sphere_num_ * 4 * sizeof(float));
-	copyArrayToDevice(d_velo_, h_velo_, 0, sphere_num_ * 4 * sizeof(float));
+	copyArrayToDevice(d_pos_, h_pos_,0, sphere_num_ * 3 * sizeof(float));
+	copyArrayToDevice(d_velo_, h_velo_, 0, sphere_num_ * 3 * sizeof(float));
+	copyArrayToDevice(d_radius_, h_radius_, 0, sphere_num_ * sizeof(float));
+	copyArrayToDevice(d_mass_, h_mass_, 0, sphere_num_ * sizeof(float));
 }
 
 float * PhysicsEngine::outputPos()
 {
 	//threadSync();
-	copyArrayFromDevice_(h_pos_, d_pos_, sizeof(float) * 4 *sphere_num_);
+	copyArrayFromDevice(h_pos_, d_pos_, sizeof(float) * 3 *sphere_num_);
 	// checkCudaErrors(cudaMemcpy(h_pos_, d_pos_, sizeof(float) * 4 * sphere_num_, cudaMemcpyDeviceToHost));
 	return h_pos_;
 }
 
-void PhysicsEngine::update(float deltaTime)
+void PhysicsEngine::update(float elapse)
 {
 	
 	// update constants
 	setParameters(&m_params);
 
 	// integrate
-	integrateSystem(
+	update_dynamics(
 		d_pos_,
 		d_velo_,
-		deltaTime,
+		d_radius_,
+		elapse,
 		sphere_num_);
 
 	// calculate grid hash
 	calcHash(
-		m_dGridParticleHash,
-		m_dGridParticleIndex,
+		d_hash_,
+		d_index_,
 		d_pos_,
 		sphere_num_);
 
 	// sort particles based on hash
-	sortParticles(m_dGridParticleHash, m_dGridParticleIndex, sphere_num_);
+	radixSortByHash(
+		d_hash_, 
+		d_index_, 
+		sphere_num_);
 
 	// reorder particle arrays into sorted order and
 	// find start and end of each cell
 	reorderDataAndFindCellStart(
 		m_dCellStart,
 		m_dCellEnd,
-		m_dSortedPos,
-		m_dSortedVel,
-		m_dGridParticleHash,
-		m_dGridParticleIndex,
+		d_pos_sorted_,
+		d_velo_sorted_,
+		d_hash_,
+		d_index_,
 		d_pos_,
 		d_velo_,
 		sphere_num_,
@@ -198,11 +224,11 @@ void PhysicsEngine::update(float deltaTime)
 	// process collisions
 	collide(
 		d_velo_,
-		m_dSortedPos,
-		m_dSortedVel,
+		d_pos_sorted_,
+		d_velo_sorted_,
 		d_radius_,
 		d_mass_,
-		m_dGridParticleIndex,
+		d_index_,
 		m_dCellStart,
 		m_dCellEnd,
 		sphere_num_,

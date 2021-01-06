@@ -41,9 +41,6 @@
     <CudaCompile Include="physicsEngine_cuda.cu" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="data.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
     <ClInclude Include="sphere.h">
       <Filter>头文件</Filter>
     </ClInclude>

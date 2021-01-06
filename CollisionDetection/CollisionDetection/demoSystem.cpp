@@ -10,7 +10,7 @@
 #include <learnopengl/camera.h>
 #include <stb_image.h>
 
-#include "data.h"
+#include "sphere.h"
 #include "demoSystem.h"
 
 DemoSystem::DemoSystem()
@@ -20,14 +20,12 @@ DemoSystem::DemoSystem()
 	float timestep = 0.5f;
 	float damping = 1.0f;
 	float gravity = 0.0003f;
-	int iterations = 1;
 	int ballr = 10;
 
 	float collideSpring = 0.5f;;
 	float collideDamping = 0.02f;;
 	float collideShear = 0.1f;
 	float collideAttraction = 0.0f;
-	engine_->setIterations(iterations);
 	engine_->setDamping(damping);
 	engine_->setGravity(-gravity);
 	engine_->setCollideSpring(collideSpring);
@@ -330,18 +328,16 @@ void DemoSystem::updateShader()
 
 void DemoSystem::updateSpherePosition(float delta_time)
 {
-	float timestep = 0.5f;
-	float damping = 1.00f;
-	float gravity = 0.001f;//0.0003f;
-	int iterations = 1;
+	float timestep = 0.1f;//0.5f
+	float damping = 0.999f;
+	float gravity = 0.05f;//0.001f;
 	int ballr = 10;
 
-	float collideSpring = 0.5f;
+	float collideSpring = 2.5f;//0.5f;
 	float collideDamping = 0.02f;
 	float collideShear = 0.1f;
 	float collideAttraction = 0.0f;
-	float collideE = 0.05f;
-	engine_->setIterations(iterations);
+	float collideE = 0.2f;
 	engine_->setDamping(damping);
 	engine_->setGravity(-gravity);
 	engine_->setCollideSpring(collideSpring);
@@ -352,18 +348,20 @@ void DemoSystem::updateSpherePosition(float delta_time)
 	engine_->update(timestep);
 	
 	float* updated_pos = engine_->outputPos();
+	float *sphere_radius = engine_->getSphereRadius();
 	// draw spheres
 	glBindVertexArray(sphereVAO_);
 	// glDrawElements(GL_TRIANGLE_STRIP, sphereIndexCount, GL_UNSIGNED_INT, 0);
-	for (unsigned int i = 0; i < sphere_num_ * 4; i+=4)
+	for (uint i = 0; i < sphere_num_; ++i)
 	{
 		// calculate the model matrix for each object and pass it to shader before drawing
 		glm::mat4 model = glm::mat4(1.0f);
-		model = glm::translate(model, glm::vec3(updated_pos[i], updated_pos[i+1], updated_pos[i+2]));
+		uint i_x3 = i * 3;
+		model = glm::translate(model, glm::vec3(updated_pos[i_x3], updated_pos[i_x3 +1], updated_pos[i_x3 +2]));
 		float angle = 20.0f * i;
 		model = glm::rotate(model, glm::radians(angle), glm::vec3(1.0f, 0.3f, 0.5f));
 		lighting_shader_.setMat4("model", model);
-		lighting_shader_.setFloat("radius", 1.0f/64.0f);
+		lighting_shader_.setFloat("radius", sphere_radius[i]);
 		glDrawElements(GL_TRIANGLE_STRIP, sphere_index_count_, GL_UNSIGNED_INT, 0);
 	}
 	//system("pause");

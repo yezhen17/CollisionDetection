@@ -73,49 +73,7 @@ extern "C"
         checkCudaErrors(cudaMemcpy((char *) device + offset, host, size, cudaMemcpyHostToDevice));
     }
 
-    void registerGLBufferObject(uint vbo, struct cudaGraphicsResource **cuda_vbo_resource)
-    {
-        checkCudaErrors(cudaGraphicsGLRegisterBuffer(cuda_vbo_resource, vbo,
-                                                     cudaGraphicsMapFlagsNone));
-    }
-
-    void unregisterGLBufferObject(struct cudaGraphicsResource *cuda_vbo_resource)
-    {
-        checkCudaErrors(cudaGraphicsUnregisterResource(cuda_vbo_resource));
-    }
-
-    void *mapGLBufferObject(struct cudaGraphicsResource **cuda_vbo_resource)
-    {
-        void *ptr;
-        checkCudaErrors(cudaGraphicsMapResources(1, cuda_vbo_resource, 0));
-        size_t num_bytes;
-        checkCudaErrors(cudaGraphicsResourceGetMappedPointer((void **)&ptr, &num_bytes,
-                                                             *cuda_vbo_resource));
-        return ptr;
-    }
-
-    void unmapGLBufferObject(struct cudaGraphicsResource *cuda_vbo_resource)
-    {
-        checkCudaErrors(cudaGraphicsUnmapResources(1, &cuda_vbo_resource, 0));
-    }
-
-    void copyArrayFromDevice(void *host, const void *device,
-                             struct cudaGraphicsResource **cuda_vbo_resource, int size)
-    {
-        if (cuda_vbo_resource)
-        {
-            device = mapGLBufferObject(cuda_vbo_resource);
-        }
-
-        checkCudaErrors(cudaMemcpy(host, device, size, cudaMemcpyDeviceToHost));
-
-        if (cuda_vbo_resource)
-        {
-            unmapGLBufferObject(*cuda_vbo_resource);
-        }
-    }
-
-	void copyArrayFromDevice_(void *host, const void *device, int size)
+	void copyArrayFromDevice(void *host, const void *device, int size)
 	{
 		checkCudaErrors(cudaMemcpy(host, device, size, cudaMemcpyDeviceToHost));
 		//cudaMemcpyFromSymbol(host, device, size);
@@ -140,33 +98,35 @@ extern "C"
         numBlocks = iDivUp(n, numThreads);
     }
 
-    void integrateSystem(float *pos,
-                         float *vel,
-                         float deltaTime,
-                         uint numParticles)
+    void update_dynamics(float *pos, float *velo, float *radius, float elapse, uint sphere_num)
     {
-        thrust::device_ptr<float4> d_pos4((float4 *)pos);
+        /*thrust::device_ptr<float4> d_pos4((float4 *)pos);
         thrust::device_ptr<float4> d_vel4((float4 *)vel);
 
         thrust::for_each(
             thrust::make_zip_iterator(thrust::make_tuple(d_pos4, d_vel4)),
             thrust::make_zip_iterator(thrust::make_tuple(d_pos4+numParticles, d_vel4+numParticles)),
-            integrate_functor(deltaTime));
+            integrate_functor(deltaTime));*/
+		uint numThreads, numBlocks;
+		computeGridSize(sphere_num, 256, numBlocks, numThreads);
+		update_dynamics<<< numBlocks, numThreads >>>(
+			(float3 *) pos, 
+			(float3 *) velo, 
+			radius, 
+			elapse, 
+			sphere_num);
+		getLastCudaError("Kernel execution failed");
     }
 
-    void calcHash(uint  *gridParticleHash,
-                  uint  *gridParticleIndex,
-                  float *pos,
-                  int    numParticles)
+    void calcHash(uint  *hash, uint  *index, float *pos, uint sphere_num)
     {
         uint numThreads, numBlocks;
-        computeGridSize(numParticles, 256, numBlocks, numThreads);
-
-        // execute the kernel
-        calcHashD<<< numBlocks, numThreads >>>(gridParticleHash,
-                                               gridParticleIndex,
-                                               (float4 *) pos,
-                                               numParticles);
+        computeGridSize(sphere_num, 256, numBlocks, numThreads);
+        calcHashD<<< numBlocks, numThreads >>>(
+			hash,
+			index,
+			(float3 *) pos,
+			sphere_num);
 
         // check if kernel invocation generated an error
         getLastCudaError("Kernel execution failed");
@@ -174,10 +134,10 @@ extern "C"
 
     void reorderDataAndFindCellStart(uint  *cellStart,
                                      uint  *cellEnd,
-                                     float *sortedPos,
-                                     float *sortedVel,
-                                     uint  *gridParticleHash,
-                                     uint  *gridParticleIndex,
+                                     float *pos_sorted,
+                                     float *velo_sorted,
+                                     uint  *hash,
+                                     uint  *index,
                                      float *oldPos,
                                      float *oldVel,
                                      uint   numParticles,
@@ -188,38 +148,23 @@ extern "C"
 
         // set all cells to empty
         checkCudaErrors(cudaMemset(cellStart, 0xffffffff, numCells*sizeof(uint)));
-
-#if USE_TEX
-        checkCudaErrors(cudaBindTexture(0, oldPosTex, oldPos, numParticles*sizeof(float4)));
-        checkCudaErrors(cudaBindTexture(0, oldVelTex, oldVel, numParticles*sizeof(float4)));
-#endif
-
-        uint smemSize = sizeof(uint)*(numThreads+1);
-        reorderDataAndFindCellStartD<<< numBlocks, numThreads, smemSize>>>(
+        reorderDataAndFindCellStartD<<< numBlocks, numThreads >>>(
             cellStart,
             cellEnd,
-            (float4 *) sortedPos,
-            (float4 *) sortedVel,
-            gridParticleHash,
-            gridParticleIndex,
-            (float4 *) oldPos,
-            (float4 *) oldVel,
+            (float3 *) pos_sorted,
+            (float3 *)velo_sorted,
+            hash,
+            index,
+            (float3 *) oldPos,
+            (float3 *) oldVel,
             numParticles);
         getLastCudaError("Kernel execution failed: reorderDataAndFindCellStartD");
 
-#if USE_TEX
-        checkCudaErrors(cudaUnbindTexture(oldPosTex));
-        checkCudaErrors(cudaUnbindTexture(oldVelTex));
-#endif
     }
 
-	//void collide(float * newVel, float * sortedPos, float * sortedVel, uint * gridParticleIndex, uint * cellStart, uint * cellEnd, uint numParticles, uint numCells)
-	//{
-	//}
-
     void collide(float *newVel,
-                 float *sortedPos,
-                 float *sortedVel,
+                 float *pos_sorted,
+                 float *velo_sorted,
 		         float *radius,
 		float *mass,
                  uint  *gridParticleIndex,
@@ -228,21 +173,15 @@ extern "C"
                  uint   numParticles,
                  uint   numCells)
     {
-#if USE_TEX
-        checkCudaErrors(cudaBindTexture(0, oldPosTex, sortedPos, numParticles*sizeof(float4)));
-        checkCudaErrors(cudaBindTexture(0, oldVelTex, sortedVel, numParticles*sizeof(float4)));
-        checkCudaErrors(cudaBindTexture(0, cellStartTex, cellStart, numCells*sizeof(uint)));
-        checkCudaErrors(cudaBindTexture(0, cellEndTex, cellEnd, numCells*sizeof(uint)));
-#endif
 
         // thread per particle
         uint numThreads, numBlocks;
         computeGridSize(numParticles, 64, numBlocks, numThreads);
 
         // execute the kernel
-        collideD<<< numBlocks, numThreads >>>((float4 *)newVel,
-                                              (float4 *)sortedPos,
-                                              (float4 *)sortedVel,
+        collideD<<< numBlocks, numThreads >>>((float3 *)newVel,
+                                              (float3 *)pos_sorted,
+                                              (float3 *)velo_sorted,
 			radius, mass,
                                               gridParticleIndex,
                                               cellStart,
@@ -252,16 +191,10 @@ extern "C"
         // check if kernel invocation generated an error
         getLastCudaError("Kernel execution failed");
 
-#if USE_TEX
-        checkCudaErrors(cudaUnbindTexture(oldPosTex));
-        checkCudaErrors(cudaUnbindTexture(oldVelTex));
-        checkCudaErrors(cudaUnbindTexture(cellStartTex));
-        checkCudaErrors(cudaUnbindTexture(cellEndTex));
-#endif
     }
 
 
-    void sortParticles(uint *dGridParticleHash, uint *dGridParticleIndex, uint numParticles)
+    void radixSortByHash(uint *dGridParticleHash, uint *dGridParticleIndex, uint numParticles)
     {
         thrust::sort_by_key(thrust::device_ptr<uint>(dGridParticleHash),
                             thrust::device_ptr<uint>(dGridParticleHash + numParticles),

@@ -36,12 +36,12 @@ protected:
 	float *d_rest_;
 	float *d_radius_;
 
-	float *m_dSortedPos;
-	float *m_dSortedVel;
+	float *d_pos_sorted_;
+	float *d_velo_sorted_;
 
 	// grid data for sorting method
-	uint  *m_dGridParticleHash; // grid hash value for each particle
-	uint  *m_dGridParticleIndex;// particle index for each particle
+	uint  *d_hash_; // grid hash value for each particle
+	uint  *d_index_;// particle index for each particle
 	uint  *m_dCellStart;        // index of start of each cell in sorted list
 	uint  *m_dCellEnd;          // index of end of cell
 
@@ -61,15 +61,11 @@ protected:
 	// params
 	SimParams m_params;
 	uint3 m_gridSize;
+	uint3 grid_exp_;
 	uint m_numGridCells;
 
-	uint m_solverIterations;
 
 public:
-	void setIterations(int i)
-	{
-		m_solverIterations = i;
-	}
 
 	void setDamping(float x)
 	{
@@ -104,6 +100,11 @@ public:
 	void setColliderPos(float3 x)
 	{
 		m_params.colliderPos = x;
+	}
+
+	float *getSphereRadius()
+	{
+		return h_radius_;
 	}
 };
 

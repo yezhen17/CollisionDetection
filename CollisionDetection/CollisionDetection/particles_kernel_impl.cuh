@@ -31,18 +31,10 @@ namespace cg = cooperative_groups;
 #include "math_constants.h"
 #include "particles_kernel.cuh"
 
-#if USE_TEX
-// textures for particle position and velocity
-texture<float4, 1, cudaReadModeElementType> oldPosTex;
-texture<float4, 1, cudaReadModeElementType> oldVelTex;
-
-texture<uint, 1, cudaReadModeElementType> gridParticleHashTex;
-texture<uint, 1, cudaReadModeElementType> cellStartTex;
-texture<uint, 1, cudaReadModeElementType> cellEndTex;
-#endif
-
 // simulation parameters in constant memory
 __constant__ SimParams params;
+
+#define GET_INDEX __mul24(blockIdx.x,blockDim.x) + threadIdx.x
 
 
 struct integrate_functor
@@ -114,41 +106,113 @@ struct integrate_functor
     }
 };
 
-// calculate position in uniform grid
-__device__ int3 calcGridPos(float3 p)
+__global__ void update_dynamics(float3 *pos4_, float3 *velo4_, float *radius_, float elapse, uint sphere_num)
 {
-    int3 gridPos;
-    gridPos.x = floor((p.x - params.worldOrigin.x) / params.cellSize.x);
-    gridPos.y = floor((p.y - params.worldOrigin.y) / params.cellSize.y);
-    gridPos.z = floor((p.z - params.worldOrigin.z) / params.cellSize.z);
-    return gridPos;
+	uint index = GET_INDEX;
+	if (index >= sphere_num) return;
+
+	float3 pos = pos4_[index];
+	float3 velo = velo4_[index];
+
+	/*float3 pos = make_float3(pos4.x, pos4.y, pos4.z);
+	float3 velo = make_float3(velo4.x, velo4.y, velo4.z);*/
+	float radius = radius_[index];
+
+	velo += params.gravity * elapse;
+	velo *= params.globalDamping;
+
+	// new position = old position + velocity * deltaTime
+	pos += velo * elapse;
+
+	// set this to zero to disable collisions with cube sides
+#if 1
+
+	if (pos.x > 1.0f - radius)
+	{
+		pos.x = 1.0f - radius;
+		velo.x *= params.boundaryDamping;
+	}
+
+	if (pos.x < -1.0f + radius)
+	{
+		pos.x = -1.0f + radius;
+		velo.x *= params.boundaryDamping;
+	}
+
+	if (pos.y > 1.0f - radius)
+	{
+		pos.y = 1.0f - radius;
+		velo.y *= params.boundaryDamping;
+	}
+
+	if (pos.z > 1.0f - radius)
+	{
+		pos.z = 1.0f - radius;
+		velo.z *= params.boundaryDamping;
+	}
+
+	if (pos.z < -1.0f + radius)
+	{
+		pos.z = -1.0f + radius;
+		velo.z *= params.boundaryDamping;
+	}
+
+#endif
+
+	if (pos.y < -1.0f + radius)
+	{
+		pos.y = -1.0f + radius;
+		velo.y *= params.boundaryDamping;
+	}
+    
+	pos4_[index] = pos;
+	velo4_[index] = velo;
 }
 
-// calculate address in grid from position (clamping to edges)
-__device__ uint calcGridHash(int3 gridPos)
+// calculate position in uniform grid
+__device__ int3 convertWorldPosToGrid(float3 world_pos)
 {
-    gridPos.x = gridPos.x & (params.gridSize.x-1);  // wrap grid, assumes size is power of 2
-    gridPos.y = gridPos.y & (params.gridSize.y-1);
-    gridPos.z = gridPos.z & (params.gridSize.z-1);
-    return __umul24(__umul24(gridPos.z, params.gridSize.y), params.gridSize.x) + __umul24(gridPos.y, params.gridSize.x) + gridPos.x;
+	int3 grid_pos;
+	grid_pos.x = floor((world_pos.x - params.worldOrigin.x) / params.cellSize.x);
+	grid_pos.y = floor((world_pos.y - params.worldOrigin.y) / params.cellSize.y);
+	grid_pos.z = floor((world_pos.z - params.worldOrigin.z) / params.cellSize.z);
+    return grid_pos;
+}
+
+
+
+// calculate address in grid from position (clamping to edges)
+__device__ uint hash_func(int3 grid_pos)
+{
+	grid_pos.x = grid_pos.x & (params.gridSize.x - 1);  // wrap grid, assumes size is power of 2
+	grid_pos.y = grid_pos.y & (params.gridSize.y - 1);
+	grid_pos.z = grid_pos.z & (params.gridSize.z - 1);
+	return grid_pos.x + (grid_pos.y << params.grid_exp.x) + (grid_pos.z << (params.grid_exp.x + params.grid_exp.y));
+   
+    // return __umul24(__umul24(gridPos.z, params.gridSize.y), params.gridSize.x) + __umul24(gridPos.y, params.gridSize.x) + gridPos.x;
 }
 
 // calculate grid hash value for each particle
 __global__
-void calcHashD(uint   *gridParticleHash,  // output
-               uint   *gridParticleIndex, // output
-               float4 *pos,               // input: positions
-               uint    numParticles)
+void calcHashD(uint *gridParticleHash, uint *gridParticleIndex, float3 *pos, uint sphere_num)
 {
-    uint index = __umul24(blockIdx.x, blockDim.x) + threadIdx.x;
+    uint index = GET_INDEX;
 
-    if (index >= numParticles) return;
+    if (index >= sphere_num) return;
 
-    volatile float4 p = pos[index];
+    /*volatile float3 p = pos[index];
 
     // get address in grid
-    int3 gridPos = calcGridPos(make_float3(p.x, p.y, p.z));
-    uint hash = calcGridHash(gridPos);
+    int3 gridPos = calcGridPos(make_float3(p.x, p.y, p.z));*/
+
+
+	/*int3 gridPos = calcGridPos(pos[index]);
+    uint hash = calcGridHash(gridPos);*/
+
+	float3 world_pos = pos[index];
+	int3 grid_pos = convertWorldPosToGrid(world_pos);
+
+	uint hash = hash_func(grid_pos);
 
     // store grid hash and particle index
     gridParticleHash[index] = hash;
@@ -159,70 +223,92 @@ void calcHashD(uint   *gridParticleHash,  // output
 // in the sorted hash array
 __global__
 void reorderDataAndFindCellStartD(uint   *cellStart,        // output: cell start index
-                                  uint   *cellEnd,          // output: cell end index
-                                  float4 *sortedPos,        // output: sorted positions
-                                  float4 *sortedVel,        // output: sorted velocities
-                                  uint   *gridParticleHash, // input: sorted grid hashes
-                                  uint   *gridParticleIndex,// input: sorted particle indices
-                                  float4 *oldPos,           // input: sorted position array
-                                  float4 *oldVel,           // input: sorted velocity array
-                                  uint    numParticles)
+	uint   *cellEnd,          // output: cell end index
+	float3 *sortedPos,        // output: sorted positions
+	float3 *sortedVel,        // output: sorted velocities
+	uint   *gridParticleHash, // input: sorted grid hashes
+	uint   *gridParticleIndex,// input: sorted particle indices
+	float3 *oldPos,           // input: sorted position array
+	float3 *oldVel,           // input: sorted velocity array
+	uint    sphere_num)
 {
-    // Handle to thread block group
-    cg::thread_block cta = cg::this_thread_block();
-    extern __shared__ uint sharedHash[];    // blockSize + 1 elements
-    uint index = __umul24(blockIdx.x,blockDim.x) + threadIdx.x;
+	// Handle to thread block group
+	// cg::thread_block cta = cg::this_thread_block();
+	//extern __shared__ uint sharedHash[];    // blockSize + 1 elements
+	uint index = GET_INDEX;
 
-    uint hash;
+	if (index >= sphere_num) return;
 
-    // handle case when no. of particles not multiple of block size
-    if (index < numParticles)
-    {
-        hash = gridParticleHash[index];
+	uint hash = gridParticleHash[index];
+	if (index == 0 || hash != gridParticleHash[index - 1])
+	{
+		cellStart[hash] = index;
 
-        // Load hash data into shared memory so that we can look
-        // at neighboring particle's hash value without loading
-        // two hash values per thread
-        sharedHash[threadIdx.x+1] = hash;
+		if (index > 0)
+			cellEnd[gridParticleHash[index - 1]] = index;
+	}
 
-        if (index > 0 && threadIdx.x == 0)
-        {
-            // first thread in block must load neighbor particle hash
-            sharedHash[0] = gridParticleHash[index-1];
-        }
-    }
+	if (index == sphere_num - 1)
+	{
+		cellEnd[hash] = index + 1;
+	}
 
-    cg::sync(cta);
+	// Now use the sorted index to reorder the pos and vel data
+	uint sortedIndex = gridParticleIndex[index];
+	float3 pos = oldPos[sortedIndex];       // macro does either global read or texture fetch
+	float3 vel = oldVel[sortedIndex];       // see particles_kernel.cuh
 
-    if (index < numParticles)
-    {
-        // If this particle has a different cell index to the previous
-        // particle then it must be the first particle in the cell,
-        // so store the index of this particle in the cell.
-        // As it isn't the first particle, it must also be the cell end of
-        // the previous particle's cell
+	sortedPos[index] = pos;
+	sortedVel[index] = vel;
 
-        if (index == 0 || hash != sharedHash[threadIdx.x])
-        {
-            cellStart[hash] = index;
+    //// handle case when no. of particles not multiple of block size
+    //if (index < sphere_num)
+    //{
+    //    hash = gridParticleHash[index];
 
-            if (index > 0)
-                cellEnd[sharedHash[threadIdx.x]] = index;
-        }
+    //    // Load hash data into shared memory so that we can look
+    //    // at neighboring particle's hash value without loading
+    //    // two hash values per thread
+    //    sharedHash[threadIdx.x+1] = hash;
 
-        if (index == numParticles - 1)
-        {
-            cellEnd[hash] = index + 1;
-        }
+    //    if (index > 0 && threadIdx.x == 0)
+    //    {
+    //        // first thread in block must load neighbor particle hash
+    //        sharedHash[0] = gridParticleHash[index-1];
+    //    }
+    //}
 
-        // Now use the sorted index to reorder the pos and vel data
-        uint sortedIndex = gridParticleIndex[index];
-        float4 pos = FETCH(oldPos, sortedIndex);       // macro does either global read or texture fetch
-        float4 vel = FETCH(oldVel, sortedIndex);       // see particles_kernel.cuh
+    //cg::sync(cta);
 
-        sortedPos[index] = pos;
-        sortedVel[index] = vel;
-    }
+    //if (index < sphere_num)
+    //{
+    //    // If this particle has a different cell index to the previous
+    //    // particle then it must be the first particle in the cell,
+    //    // so store the index of this particle in the cell.
+    //    // As it isn't the first particle, it must also be the cell end of
+    //    // the previous particle's cell
+
+    //    if (index == 0 || hash != sharedHash[threadIdx.x])
+    //    {
+    //        cellStart[hash] = index;
+
+    //        if (index > 0)
+    //            cellEnd[sharedHash[threadIdx.x]] = index;
+    //    }
+
+    //    if (index == sphere_num - 1)
+    //    {
+    //        cellEnd[hash] = index + 1;
+    //    }
+
+  //      // Now use the sorted index to reorder the pos and vel data
+  //      uint sortedIndex = gridParticleIndex[index];
+		//float3 pos = oldPos[sortedIndex];       // macro does either global read or texture fetch
+		//float3 vel = oldVel[sortedIndex];       // see particles_kernel.cuh
+
+  //      sortedPos[index] = pos;
+  //      sortedVel[index] = vel;
+  //  }
 
 
 }
@@ -269,9 +355,9 @@ float3 collideSpheres(float3 posA, float3 posB,
 // collide two spheres using DEM method
 __device__
 float3 collideSpheresMine(float3 posA, float3 posB,
-	float3 velA, float3 velB,
+	float3 velA, float3 velB, 
 	float radiusA, float radiusB,
-	float attraction)
+	float mass_c, float mass_n)
 {
 	// calculate relative position
 	float3 relPos = posB - posA;
@@ -291,21 +377,26 @@ float3 collideSpheresMine(float3 posA, float3 posB,
 		float3 normVel = (dot(relVel, norm) * norm);
 
 		// relative tangential velocity
-		//float3 tanVel = relVel - normVel;
+		float3 tanVel = relVel - normVel;
 
 		// spring force
-		force = -params.spring*(collideDist - dist) * norm;
+		float deform = collideDist - dist;
+		if (deform > radiusA * 2)
+		{
+			deform = radiusA * 2;
+		}
+		force = -params.spring*deform * norm;
 		// dashpot (damping) force
 		//force += params.damping*relVel;
 		// tangential shear force
-		//force += params.shear*tanVel;
+	    //force += params.shear*tanVel;
 		// attraction
 		//force += attraction * relPos;
 
 		force += params.e * normVel;
 
-		//float3 impulse = relVel * (1.0f + params.e) * 0.5f;
-		//force += dot(impulse, norm) * norm;
+	    //float3 impulse = relVel * (1.0f + params.e) * 0.5f;
+		//force = dot(impulse, norm) * norm;
 	}
 
 	return force;
@@ -315,36 +406,45 @@ float3 collideSpheresMine(float3 posA, float3 posB,
 
 // collide a particle against all other particles in a given cell
 __device__
-float3 collideCell(int3    gridPos,
-                   uint    index,
-                   float3  pos,
-                   float3  vel,
-                   float4 *oldPos,
-                   float4 *oldVel,
+float3 collideCell(int3    grid_pos,
+	uint    index,
+	float3  pos,
+	float3  vel,
+	float radius_c,
+	float mass_c,
+	float *radius_all,
+	float*mass_all,
+	float3 *oldPos,
+	float3 *oldVel,
                    uint   *cellStart,
-                   uint   *cellEnd)
+                   uint   *cellEnd,
+	uint   *gridParticleIndex)
 {
-    uint gridHash = calcGridHash(gridPos);
+    uint gridHash = hash_func(grid_pos);
 
     // get start of bucket for this cell
-    uint startIndex = FETCH(cellStart, gridHash);
+    uint startIndex = cellStart[gridHash];
 
     float3 force = make_float3(0.0f);
 
     if (startIndex != 0xffffffff)          // cell is not empty
     {
         // iterate over particles in this cell
-        uint endIndex = FETCH(cellEnd, gridHash);
+        uint endIndex = cellEnd[gridHash];
 
         for (uint j=startIndex; j<endIndex; j++)
         {
             if (j != index)                // check not colliding with self
             {
-                float3 pos2 = make_float3(FETCH(oldPos, j));
-                float3 vel2 = make_float3(FETCH(oldVel, j));
+                float3 pos2 = oldPos[j];
+                float3 vel2 = oldVel[j];
+				uint originalIndex = gridParticleIndex[j];
+
+				float radius_n = radius_all[originalIndex];
+				float mass_n = mass_all[originalIndex];
 
                 // collide two spheres
-                force += collideSpheresMine(pos, pos2, vel, vel2, params.particleRadius, params.particleRadius, params.attraction);
+                force += collideSpheresMine(pos, pos2, vel, vel2, radius_c, radius_n, mass_c, mass_n);
             }
         }
     }
@@ -354,26 +454,29 @@ float3 collideCell(int3    gridPos,
 
 
 __global__
-void collideD(float4 *newVel,               // output: new velocity
-              float4 *oldPos,               // input: sorted positions
-              float4 *oldVel,               // input: sorted velocities
-	float *radius,
-	float *mass,
+void collideD(float3 *newVel,               // output: new velocity
+	float3 *oldPos,               // input: sorted positions
+	float3 *oldVel,               // input: sorted velocities
+	float *radius_all,
+	float *mass_all,
               uint   *gridParticleIndex,    // input: sorted particle indices
               uint   *cellStart,
               uint   *cellEnd,
-              uint    numParticles)
+              uint    sphere_num)
 {
-    uint index = __mul24(blockIdx.x,blockDim.x) + threadIdx.x;
+    uint index = GET_INDEX;
 
-    if (index >= numParticles) return;
+    if (index >= sphere_num) return;
+
+	uint originalIndex = gridParticleIndex[index];
 
     // read particle data from sorted arrays
-    float3 pos = make_float3(FETCH(oldPos, index));
-    float3 vel = make_float3(FETCH(oldVel, index));
-
+    float3 pos = oldPos[index];
+    float3 vel = oldVel[index];
+	float radius_c = radius_all[originalIndex];
+	float mass_c = mass_all[originalIndex];
     // get address in grid
-    int3 gridPos = calcGridPos(pos);
+    int3 grid_pos = convertWorldPosToGrid(pos);
 
     // examine neighbouring cells
     float3 force = make_float3(0.0f);
@@ -384,8 +487,8 @@ void collideD(float4 *newVel,               // output: new velocity
         {
             for (int x=-1; x<=1; x++)
             {
-                int3 neighbourPos = gridPos + make_int3(x, y, z);
-                force += collideCell(neighbourPos, index, pos, vel, oldPos, oldVel, cellStart, cellEnd);
+                int3 neighbourPos = grid_pos + make_int3(x, y, z);
+                force += collideCell(neighbourPos, index, pos, vel, radius_c, mass_c, radius_all, mass_all, oldPos, oldVel, cellStart, cellEnd, gridParticleIndex);
             }
         }
     }
@@ -394,8 +497,9 @@ void collideD(float4 *newVel,               // output: new velocity
     // force += collideSpheres(pos, params.colliderPos, vel, make_float3(0.0f, 0.0f, 0.0f), params.particleRadius, params.colliderRadius, 0.0f);
 
     // write new velocity back to original unsorted location
-    uint originalIndex = gridParticleIndex[index];
-    newVel[originalIndex] = make_float4(vel + force, 0.0f);
+   
+
+    newVel[originalIndex] = vel + (force / mass_c);
 }
 
 #endif

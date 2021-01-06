@@ -10,7 +10,6 @@
 #include <learnopengl/shader_m.h>
 #include <learnopengl/camera.h>
 
-#include "data.h"
 #include "demoSystem.h"
 #include <iostream>
 #include "particleSystem.h"

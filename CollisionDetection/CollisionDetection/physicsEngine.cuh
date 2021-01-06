@@ -18,26 +18,14 @@ extern "C"
 
     void threadSync();
 
-    void copyArrayFromDevice(void *host, const void *device, struct cudaGraphicsResource **cuda_vbo_resource, int size);
-	void copyArrayFromDevice_(void *host, const void *device, int size);
+	void copyArrayFromDevice(void *host, const void *device, int size);
     void copyArrayToDevice(void *device, const void *host, int offset, int size);
-    void registerGLBufferObject(uint vbo, struct cudaGraphicsResource **cuda_vbo_resource);
-    void unregisterGLBufferObject(struct cudaGraphicsResource *cuda_vbo_resource);
-    void *mapGLBufferObject(struct cudaGraphicsResource **cuda_vbo_resource);
-    void unmapGLBufferObject(struct cudaGraphicsResource *cuda_vbo_resource);
-
 
     void setParameters(SimParams *hostParams);
 
-    void integrateSystem(float *pos,
-                         float *vel,
-                         float deltaTime,
-                         uint numParticles);
+    void update_dynamics(float *pos, float *velo, float *radius, float elapse, uint sphere_num);
 
-    void calcHash(uint  *gridParticleHash,
-                  uint  *gridParticleIndex,
-                  float *pos,
-                  int    numParticles);
+    void calcHash(uint *hash, uint *index, float *pos, uint sphere_num);
 
     void reorderDataAndFindCellStart(uint  *cellStart,
                                      uint  *cellEnd,
@@ -70,6 +58,6 @@ extern "C"
 		uint   numParticles,
 		uint   numCells);
 
-    void sortParticles(uint *dGridParticleHash, uint *dGridParticleIndex, uint numParticles);
+    void radixSortByHash(uint *dGridParticleHash, uint *dGridParticleIndex, uint numParticles);
 
 }
