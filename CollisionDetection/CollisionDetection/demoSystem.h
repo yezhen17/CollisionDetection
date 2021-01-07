@@ -17,6 +17,7 @@ public:
 	void mouse_callback(double xpos, double ypos);
 	void scroll_callback(double xoffset, double yoffset);
 	void processInput(GLFWwindow *window);
+	void testPerformance(uint test_iters = 1000);
 	   
 protected: // data
 	// camera

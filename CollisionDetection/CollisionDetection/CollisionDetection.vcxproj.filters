@@ -54,5 +54,8 @@
       <Filter>头文件</Filter>
     </ClInclude>
     <ClInclude Include="collision_kernel.cuh" />
+    <ClInclude Include="hSimulation.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

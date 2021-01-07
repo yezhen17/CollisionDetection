@@ -71,10 +71,13 @@ extern "C"
 		//cudaMemcpyFromSymbol(host, device, size);
 	}
 
-    void dSetupSimulation(SimulationEnv *h_env)
+    void dSetupSimulation(
+		SimulationEnv *h_env, 
+		SimulationSphereStats *h_stats)
     {
         // copy parameters to constant memory
         checkCudaErrors(cudaMemcpyToSymbol(d_env, h_env, sizeof(SimulationEnv)));
+		checkCudaErrors(cudaMemcpyToSymbol(d_stats, h_stats, sizeof(SimulationSphereStats)));
     }
 
     //Round a / b to nearest higher integer value
@@ -91,10 +94,10 @@ extern "C"
     }
 
     void dUpdateDynamics(
-		float *pos, 
-		float *velo, 
-		float *velo_delta, 
-		float *radius,
+		float *pos_s, 
+		float *velo_s, 
+		float *velo_delta_s, 
+		uint *types,
 		float elapse, 
 		uint sphere_num)
     {
@@ -103,10 +106,10 @@ extern "C"
 
 		// parallelly update the position and velocity of each sphere
 		updateDynamicsKernel <<< numBlocks, numThreads >>> (
-			(float3 *) pos, 
-			(float3 *) velo,
-			(float3 *) velo_delta,
-			radius, 
+			(float3 *)pos_s,
+			(float3 *)velo_s,
+			(float3 *)velo_delta_s,
+			types,
 			elapse);
 
 		getLastCudaError("Kernel execution failed");
@@ -154,17 +157,15 @@ extern "C"
             cell_start,
             cell_end,
             hash);
-
+		
         getLastCudaError("Kernel execution failed: collectCells");
     }
 
     void dNarrowPhaseCollisionDetection(
-		float *velo_delta,
-		float *pos,
-		float *velo,
-		float *radius,
-		float *mass,
-		float *rest,
+		float *velo_delta_s,
+		float *pos_s,
+		float *velo_s,
+		uint *types,
 		uint  *indices_sorted,
 		uint  *cell_start,
 		uint  *cell_end,
@@ -175,12 +176,10 @@ extern "C"
 
         // execute the kernel
 		collisionKernel <<< numBlocks, numThreads >>> (
-			(float3 *) velo_delta,
-			(float3 *) pos,
-			(float3 *) velo,
-			radius, 
-			mass,
-			rest,
+			(float3 *) velo_delta_s,
+			(float3 *) pos_s,
+			(float3 *) velo_s,
+			types,
 			indices_sorted,
 			cell_start,
 			cell_end);

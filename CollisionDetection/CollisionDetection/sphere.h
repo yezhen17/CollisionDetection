@@ -7,33 +7,34 @@ typedef struct Sphere
 {
 	float mass;
 	float radius;
-	float rest;
+	uint material_type;
 	float r;
 	float g;
 	float b;
+	float stiffness;
 
-	Sphere(float mass, float radius, float rest, float r, float g, float b) :
+	Sphere(float mass, float radius, uint material_type, float r, float g, float b, float stiffness=1.0f) :
 		mass(mass),
 		radius(radius),
-		rest(rest),
+		material_type(material_type),
 		r(r),
 		g(g),
-		b(b)
+		b(b),
+		stiffness(stiffness)
 	{
 
 	}
 } Sphere;
 
-const uint PROTOTYPE_NUM = 7;
 const Sphere PROTOTYPES[7] =
 {
-	Sphere(1.0f, 1.0f / 32.0f, 1.0f, 0.0f, 0.0f, 0.0f),
-	Sphere(2.0f, 1.0f / 24.0f, 1.0f, 0.0f, 0.0f, 0.0f),
-	Sphere(1.0f, 1.0f / 24.0f, 1.0f, 0.0f, 0.0f, 0.0f),
-	Sphere(1.0f, 1.0f / 24.0f, 0.5f, 0.0f, 0.0f, 0.0f),
-	Sphere(1.0f, 1.0f / 32.0f, 0.7f, 0.0f, 0.0f, 0.0f),
-	Sphere(1.0f, 1.0f / 32.0f, 1.0f, 0.0f, 0.0f, 0.0f),
-	Sphere(1.0f, 1.0f / 32.0f, 1.0f, 0.0f, 0.0f, 0.0f)
+	Sphere(1.0f, 1.0f / 32.0f, 0, 0.0f, 0.0f, 0.0f),
+	Sphere(2.0f, 1.0f / 24.0f, 0, 0.0f, 0.0f, 0.0f),
+	Sphere(1.0f, 1.0f / 24.0f, 0, 0.0f, 0.0f, 0.0f),
+	Sphere(1.0f, 1.0f / 24.0f, 0, 0.0f, 0.0f, 0.0f),
+	Sphere(1.0f, 1.0f / 32.0f, 0, 0.0f, 0.0f, 0.0f),
+	Sphere(1.0f, 1.0f / 32.0f, 0, 0.0f, 0.0f, 0.0f),
+	Sphere(1.0f, 1.0f / 32.0f, 0, 0.0f, 0.0f, 0.0f)
 };
 
 #endif

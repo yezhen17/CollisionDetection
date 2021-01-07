@@ -12,9 +12,10 @@
 #ifndef PARTICLES_KERNEL_H
 #define PARTICLES_KERNEL_H
 
-
 #include "vector_types.h"
+
 typedef unsigned int uint;
+
 
 // simulation parameters
 struct SimulationEnv
@@ -32,12 +33,18 @@ struct SimulationEnv
 
     uint sphere_num;
 
-    float spring;
+    float stiffness;
     float damping;
-    float shear;
+    float friction;
     float boundary_damping;
 
 	float e;
+};
+
+struct SimulationSphereStats
+{
+	float radii[7];
+	float masses[7];
 };
 
 #endif

@@ -27,13 +27,43 @@
 #define GET_INDEX __mul24(blockIdx.x,blockDim.x) + threadIdx.x
 
 /******* Constant GPU Memory *******/
-__constant__ SimulationEnv d_env; // simulation parameters in constant memory
+__constant__ SimulationEnv d_env; // Environment parameters
+__constant__ SimulationSphereStats d_stats; // Sphere parameters (fixed throughout simulation)
+__constant__ int3 neighboorhood_3[27] = { 
+	-1, -1, -1,
+	 0, -1, -1, 
+	 1, -1, -1,
+	-1,  0, -1,
+	 0,  0, -1,
+	 1,  0, -1,
+	-1,  1, -1,
+	 0,  1, -1,
+	 1,  1, -1,
+	-1, -1,  0,
+	 0, -1,  0,
+	 1, -1,  0,
+    -1,  0,  0,
+	 0,  0,  0,
+	 1,  0,  0,
+	-1,  1,  0,
+	 0,  1,  0,
+	 1,  1,  0,
+	-1, -1,  1,
+	 0, -1,  1,
+	 1, -1,  1,
+	-1,  0,  1,
+	 0,  0,  1,
+	 1,  0,  1,
+	-1,  1,  1,
+	 0,  1,  1,
+	 1,  1,  1,
+};
 
 __global__ void updateDynamicsKernel(
 	float3 *pos_s, 
 	float3 *velo_s, 
 	float3 *velo_delta_s, 
-	float *radii, 
+	uint *types,
 	float elapse)
 {
 	uint index = GET_INDEX;
@@ -42,7 +72,8 @@ __global__ void updateDynamicsKernel(
 	float3 pos = pos_s[index];
 	float3 velo = velo_s[index];
 	float3 velo_delta = velo_delta_s[index];
-	float radius = radii[index];
+	uint type = types[index];
+	float radius = d_stats.radii[type];
 
 	velo += velo_delta;
 	velo += d_env.gravity * elapse;
@@ -118,8 +149,7 @@ __device__ uint hashFunc(int3 grid_pos)
 }
 
 // calculate grid hash value for each particle
-__global__
-void hashifyKernel(
+__global__ void hashifyKernel(
 	uint *hashes, 
 	uint *indices_to_sort,
 	float3 *pos)
@@ -203,19 +233,18 @@ __device__ float3 collisionAtomic(
 		// relative tangential velocity
 		float3 velo_tangent = velo_relative - velo_normal;
 
-		// spring force
+		// stiffness force
 		float deform = radius_sum - distance;
 		if (deform > radius_c * 2)
 		{
 			deform = radius_c * 2;
 		}
-		force = -(d_env.spring * deform) * normal;
-		// dashpot (damping) force
-		//force += d_env.damping*velo_relative;
-		// tangential shear force
-	    //force += d_env.shear*velo_tangent;
+		force = -(d_env.stiffness * deform) * normal;
+		
+		// tangential friction force
+	    force += d_env.friction*velo_tangent;
 
-		force += d_env.e * velo_normal;
+		force += d_env.damping * velo_normal;
 
 	    //float3 impulse = velo_relative * (1.0f + d_env.e) * 0.5f;
 		//force = dot(impulse, normal) * normal;
@@ -224,57 +253,11 @@ __device__ float3 collisionAtomic(
 	return force;
 }
 
-// collide a particle against all other particles in a given cell
-__device__ float3 collisionInCell(
-	int3 grid_pos,
-	uint index_self,
-	float3 pos_c,
-	float3 velo_c,
-	float radius_c,
-	float mass_c,
-	float *radii,
-	float *masses,
-	float3 *pos_s,
-	float3 *velo_s,
-	uint *cell_start,
-	uint *cell_end,
-	uint *indices_sorted)
-{
-    uint hash = hashFunc(grid_pos);
-
-    // get start of bucket for this cell
-    uint index_cell_start = cell_start[hash];
-
-    float3 force = make_float3(0.0f);
-
-    if (index_cell_start != 0xffffffff)          // cell is not empty
-    {
-        // iterate over particles in this cell
-        uint index_cell_end = cell_end[hash];
-		for (uint j = index_cell_start; j < index_cell_end; ++j)
-        {
-			uint index_origin = indices_sorted[j];
-            if (index_origin != index_self)                // check not colliding with self
-            {	
-				float3 pos_n = pos_s[index_origin];
-				float3 vel_n = velo_s[index_origin];
-				float radius_n = radii[index_origin];
-				float mass_n = masses[index_origin];
-                // collide two spheres
-                force += collisionAtomic(pos_c, pos_n, velo_c, vel_n, radius_c, radius_n, mass_c, mass_n);
-            }
-        }
-    }
-    return force;
-}
-
 __global__ void collisionKernel(
 	float3 *velo_delta_s,               // output: new velocity
 	float3 *pos_s,               // input: sorted positions
 	float3 *velo_s,               // input: sorted velocities
-	float *radii,
-	float *masses,
-	float *rest_s,
+	uint *types,
 	uint   *indices_sorted,    // input: sorted particle indices_sorted
 	uint   *cell_start,
 	uint   *cell_end)
@@ -283,46 +266,50 @@ __global__ void collisionKernel(
     if (index >= d_env.sphere_num) return;
 
 	// Now use the sorted index to reorder the pos and vel data
-	uint index_origin = indices_sorted[index];
-    float3 pos = pos_s[index_origin];
-    float3 velo = velo_s[index_origin];
-	float radius_c = radii[index_origin];
-	float mass_c = masses[index_origin];
-	float rest_c = rest_s[index_origin];
+	uint index_origin_c = indices_sorted[index];
+    float3 pos_c = pos_s[index_origin_c];
+    float3 velo_c = velo_s[index_origin_c];
+	uint type_c = types[index_origin_c];
+	float radius_c = d_stats.radii[type_c];
+	float mass_c = d_stats.masses[type_c];
+	
     // get address in grid
-    int3 grid_pos = convertWorldPosToGrid(pos);
+    int3 grid_pos_c = convertWorldPosToGrid(pos_c);
 
     // examine neighbouring cells
     float3 force = make_float3(0.0f);
 
 	// need not deal with out-of-boundary neighbors because of hashing
-	for (int z = -1; z <= 1; ++z)
-    {
-		for (int y = -1; y <= 1; ++y)
-        {
-			for (int x = -1; x <= 1; ++x)
-            {
-                int3 adjacent_pos = grid_pos + make_int3(x, y, z);
-                force += collisionInCell(
-					adjacent_pos,
-					index_origin, 
-					pos, 
-					velo, 
-					radius_c, 
-					mass_c, 
-					radii, 
-					masses, 
-					pos_s, 
-					velo_s, 
-					cell_start, 
-					cell_end, 
-					indices_sorted);
-            }
-        }
-    }
+	for (uint i = 0; i < 27; ++i)
+	{
+		uint hash = hashFunc(grid_pos_c + neighboorhood_3[i]);
+
+		// get start of bucket for this cell
+		uint index_cell_start = cell_start[hash];
+
+		if (index_cell_start != 0xffffffff)          // cell is not empty
+		{
+			// iterate over particles in this cell
+			uint index_cell_end = cell_end[hash];
+			for (uint j = index_cell_start; j < index_cell_end; ++j)
+			{
+				uint index_origin_n = indices_sorted[j];
+				if (index_origin_n != index_origin_c)                // check not colliding with self
+				{
+					float3 pos_n = pos_s[index_origin_n];
+					float3 vel_n = velo_s[index_origin_n];
+					uint type_n = types[index_origin_n];
+					float radius_n = d_stats.radii[type_n];
+					float mass_n = d_stats.masses[type_n];
+					// collide two spheres
+					force += collisionAtomic(pos_c, pos_n, velo_c, vel_n, radius_c, radius_n, mass_c, mass_n);
+				}
+			}
+		}
+	}
 
     // write velocity change
-	velo_delta_s[index_origin] = force / mass_c;
+	velo_delta_s[index_origin_c] = force / mass_c;
 }
 
 #endif

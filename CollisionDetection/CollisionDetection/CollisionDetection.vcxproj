@@ -178,6 +178,7 @@
     <None Include="physicsEngine.cuh" />
     <None Include="particles_kernel.cuh" />
     <None Include="particles_kernel_impl.cuh" />
+    <ClInclude Include="hSimulation.h" />
     <ClInclude Include="physicsEngine.h" />
     <ClInclude Include="sphere.h" />
   </ItemGroup>

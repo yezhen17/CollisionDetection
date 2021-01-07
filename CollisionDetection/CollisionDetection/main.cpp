@@ -46,8 +46,6 @@ glm::vec3 lightPos(1.2f, 1.0f, 2.0f);
 DemoSystem* demoSystem = 0;
 
 extern "C" void cudaInit(int argc, char **argv);
-extern "C" void cudaGLInit(int argc, char **argv);
-extern "C" void copyArrayFromDevice(void *host, const void *device, unsigned int vbo, int size);
 
 int main(int argc, char **argv)
 {
@@ -66,11 +64,15 @@ int main(int argc, char **argv)
 	{
 		psystem->update(0.01f);
 	}*/
+
 	demoSystem = new DemoSystem();
 	demoSystem->initSystem();
+	demoSystem->testPerformance();
+
+	/*demoSystem->initSystem();
 	demoSystem->initWindow();
 	demoSystem->initData();
-	demoSystem->mainLoop();
+	demoSystem->mainLoop();*/
 	system("pause");
 	return 0;
 }

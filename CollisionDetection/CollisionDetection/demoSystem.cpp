@@ -10,6 +10,9 @@
 #include <learnopengl/camera.h>
 #include <stb_image.h>
 
+#include <windows.h>
+#include <windef.h>
+
 #include "sphere.h"
 #include "demoSystem.h"
 
@@ -17,18 +20,6 @@ DemoSystem::DemoSystem()
 {
 	engine_ = new PhysicsEngine();
 	sphere_num_ = SPHERE_NUM;
-	/*float timestep = 0.5f;
-	float damping = 1.0f;
-	float gravity = 0.0003f;
-
-	float collideSpring = 0.5f;;
-	float collideDamping = 0.02f;;
-	float collideShear = 0.1f;
-	engine_->setDrag(damping);
-	engine_->setGravity(-gravity);
-	engine_->setCollideSpring(collideSpring);
-	engine_->setCollideDamping(collideDamping);
-	engine_->setCollideShear(collideShear);*/
 }
 
 DemoSystem::~DemoSystem()
@@ -205,7 +196,7 @@ void DemoSystem::mainLoop()
 		deltaTime_ = currentFrame - lastFrame_;
 		lastFrame_ = currentFrame;
 
-		printf("%.6f", deltaTime_);
+		//printf("%.6f", deltaTime_);
 		//Sleep(200);
 		
 		// input
@@ -259,6 +250,29 @@ void DemoSystem::processInput(GLFWwindow *window)
 		camera_.ProcessKeyboard(LEFT, deltaTime_);
 	if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
 		camera_.ProcessKeyboard(RIGHT, deltaTime_);
+}
+
+void DemoSystem::testPerformance(uint test_iters)
+{
+	LARGE_INTEGER frequency, startCount, stopCount;
+	BOOL ret;
+	//返回性能计数器每秒滴答的个数
+	ret = QueryPerformanceFrequency(&frequency);
+	if (ret) {
+		ret = QueryPerformanceCounter(&startCount);
+	}
+	for (uint i = 0; i < test_iters; ++i)
+	{
+		engine_->update(0.1f);
+	}
+	if (ret) {
+		QueryPerformanceCounter(&stopCount);
+	}
+	if (ret) {
+		LONGLONG elapsed = (stopCount.QuadPart - startCount.QuadPart) * 1000000 / frequency.QuadPart;
+		printf("QueryPerformanceFrequency & QueryPerformanceCounter = %ld us", elapsed);
+	}
+	
 }
 
 void DemoSystem::updateShader()
@@ -325,24 +339,17 @@ void DemoSystem::updateShader()
 
 void DemoSystem::updateSpherePosition(float delta_time)
 {
-	float timestep = 0.1f;//0.5f
-	//float damping = 0.999f;
-	//float gravity = 0.05f;//0.001f;
+	float currentFrame1 = glfwGetTime();
 
-	//float collideSpring = 2.5f;//0.5f;
-	//float collideDamping = 0.02f;
-	//float collideShear = 0.1f;
-	//float collideE = 0.2f;
-	//engine_->setDrag(damping);
-	//engine_->setGravity(-gravity);
-	//engine_->setCollideSpring(collideSpring);
-	//engine_->setCollideDamping(collideDamping);
-	//engine_->setCollideShear(collideShear);
-	//engine_->setCollideE(collideE);
+	float timestep = 0.1f;//0.5f
 	engine_->update(timestep);
 	
 	float* updated_pos = engine_->outputPos();
-	float *sphere_radius = engine_->getSphereRadius();
+
+	float currentFrame2 = glfwGetTime();
+	printf("%.6f", currentFrame2 - currentFrame1);
+
+	uint *type = engine_->getSphereType();
 	// draw spheres
 	glBindVertexArray(sphereVAO_);
 	// glDrawElements(GL_TRIANGLE_STRIP, sphereIndexCount, GL_UNSIGNED_INT, 0);
@@ -355,7 +362,7 @@ void DemoSystem::updateSpherePosition(float delta_time)
 		float angle = 20.0f * i;
 		model = glm::rotate(model, glm::radians(angle), glm::vec3(1.0f, 0.3f, 0.5f));
 		lighting_shader_.setMat4("model", model);
-		lighting_shader_.setFloat("radius", sphere_radius[i]);
+		lighting_shader_.setFloat("radius", PROTOTYPES[type[i]].radius);
 		glDrawElements(GL_TRIANGLE_STRIP, sphere_index_count_, GL_UNSIGNED_INT, 0);
 	}
 	//system("pause");
