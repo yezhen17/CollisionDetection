@@ -28,8 +28,8 @@ protected: // data
 	uint sphereVBO_;
 	uint sphereEBO_;
 	GLuint sphere_index_count_;
-	Camera camera_;
-	Shader lighting_shader_;
+	Camera *camera_;
+	Shader *lighting_shader_;
 	float lastX_;
 	float lastY_;
 	bool firstMouse_;

@@ -43,7 +43,7 @@ float lastFrame = 0.0f;
 // lighting
 glm::vec3 lightPos(1.2f, 1.0f, 2.0f);
 
-DemoSystem* demoSystem = 0;
+DemoSystem* demo_system = 0;
 
 extern "C" void cudaInit(int argc, char **argv);
 
@@ -65,15 +65,15 @@ int main(int argc, char **argv)
 		psystem->update(0.01f);
 	}*/
 
-	demoSystem = new DemoSystem();
-	demoSystem->initSystem();
-	demoSystem->testPerformance();
+	demo_system = new DemoSystem();
+	/*demo_system->initSystem();
+	demo_system->testPerformance();
+*/
+	demo_system->initSystem();
+	demo_system->initWindow();
+	demo_system->initData();
+	demo_system->mainLoop();
 
-	/*demoSystem->initSystem();
-	demoSystem->initWindow();
-	demoSystem->initData();
-	demoSystem->mainLoop();*/
-	system("pause");
 	return 0;
 }
 
@@ -321,7 +321,7 @@ int main2() {
 
 		// be sure to activate shader when setting uniforms/drawing objects
 		lightingShader.use();
-		lightingShader.setVec3("viewPos", camera.Position);
+		lightingShader.setVec3("viewPos", camera.camera_pos_);
 		lightingShader.setFloat("material.shininess", 32.0f);
 
 		/*
@@ -368,8 +368,8 @@ int main2() {
 		lightingShader.setFloat("pointLights[3].linear", 0.09);
 		lightingShader.setFloat("pointLights[3].quadratic", 0.032);
 		// spotLight
-		lightingShader.setVec3("spotLight.position", camera.Position);
-		lightingShader.setVec3("spotLight.direction", camera.Front);
+		lightingShader.setVec3("spotLight.position", camera.camera_pos_);
+		lightingShader.setVec3("spotLight.direction", camera.camera_front_);
 		lightingShader.setVec3("spotLight.ambient", 0.0f, 0.0f, 0.0f);
 		lightingShader.setVec3("spotLight.diffuse", 1.0f, 1.0f, 1.0f);
 		lightingShader.setVec3("spotLight.specular", 1.0f, 1.0f, 1.0f);
@@ -380,7 +380,7 @@ int main2() {
 		lightingShader.setFloat("spotLight.outerCutOff", glm::cos(glm::radians(15.0f)));
 
 		// view/projection transformations
-		glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
+		glm::mat4 projection = glm::perspective(glm::radians(camera.zoom_), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
 		glm::mat4 view = camera.GetViewMatrix();
 		lightingShader.setMat4("projection", projection);
 		lightingShader.setMat4("view", view);

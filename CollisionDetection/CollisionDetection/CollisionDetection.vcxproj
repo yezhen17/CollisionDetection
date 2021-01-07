@@ -172,6 +172,7 @@
     </CudaCompile>
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="camera.h" />
     <ClInclude Include="collision_kernel.cuh" />
     <ClInclude Include="demoSystem.h" />
     <ClInclude Include="global.h" />

@@ -180,9 +180,9 @@ void PhysicsEngine::initData()
 
 				if (i < sphere_num_)
 				{
-					h_pos_[i * 3] = (env_.max_radius*2.0f * x) + env_.max_radius - 1.0f + (rand() / (float)RAND_MAX*2.0f - 1.0f)*jitter;
-					h_pos_[i * 3 + 1] = (env_.max_radius*2.0f * y) + env_.max_radius - 1.0f + (rand() / (float)RAND_MAX*2.0f - 1.0f)*jitter;
-					h_pos_[i * 3 + 2] = (env_.max_radius*2.0f * z) + env_.max_radius - 1.0f + (rand() / (float)RAND_MAX*2.0f - 1.0f)*jitter;
+					h_pos_[i * 3] = (env_.max_radius*2.0f * (x)) + env_.max_radius - 1.0f + (rand() / (float)RAND_MAX*2.0f - 1.0f)*jitter;
+					h_pos_[i * 3 + 1] = (env_.max_radius*2.0f * (y )) + env_.max_radius - 1.0f + (rand() / (float)RAND_MAX*2.0f - 1.0f)*jitter;
+					h_pos_[i * 3 + 2] = (env_.max_radius*2.0f * (z)) + env_.max_radius - 1.0f + (rand() / (float)RAND_MAX*2.0f - 1.0f)*jitter;
 
 					h_velo_[i * 3] = 0.0f;
 					h_velo_[i * 3 + 1] = 0.0f;

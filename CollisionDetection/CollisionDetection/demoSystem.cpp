@@ -7,7 +7,7 @@
 #include <glm/gtc/type_ptr.hpp>
 
 #include <learnopengl/shader_m.h>
-#include <learnopengl/camera.h>
+#include "camera.h"
 #include <stb_image.h>
 
 #include <windows.h>
@@ -30,7 +30,7 @@ DemoSystem::~DemoSystem()
 void DemoSystem::initSystem()
 {
 	// camera
-	camera_ = Camera(glm::vec3(0.0f, 0.5f, 5.0f));
+	camera_ = new Camera(5, -20, 225);
 	lastX_ = WINDOW_WIDTH / 2.0f;
 	lastY_ = WINDOW_HEIGHT / 2.0f;
 	firstMouse_ = true;
@@ -158,13 +158,13 @@ void DemoSystem::initData()
 
 	// shader configuration
 	// --------------------
-	
-	lighting_shader_.loadProgram("6.sphere.vs", "6.multiple_lights.fs");
-	lighting_shader_.use();
-	lighting_shader_.setFloat("material.shininess", 32.0f);
-	lighting_shader_.setVec3("material.ambient", 0.0f, 0.1f, 0.06f);
-	lighting_shader_.setVec3("material.diffuse", 0.0f, 0.50980392f, 0.50980392f);
-	lighting_shader_.setVec3("material.specular", 0.50196078f, 0.50196078f, 0.50196078f);
+	lighting_shader_ = new Shader();
+	lighting_shader_->loadProgram("6.sphere.vs", "6.multiple_lights.fs");
+	lighting_shader_->use();
+	lighting_shader_->setFloat("material.shininess", 32.0f);
+	lighting_shader_->setVec3("material.ambient", 0.0f, 0.1f, 0.06f);
+	lighting_shader_->setVec3("material.diffuse", 0.0f, 0.50980392f, 0.50980392f);
+	lighting_shader_->setVec3("material.specular", 0.50196078f, 0.50196078f, 0.50196078f);
 }
 
 void DemoSystem::mainLoop()
@@ -211,14 +211,14 @@ void DemoSystem::mainLoop()
 		updateShader();
 
 		// view/projection transformations
-		glm::mat4 projection = glm::perspective(glm::radians(camera_.Zoom), (float)WINDOW_WIDTH / (float)WINDOW_HEIGHT, 0.1f, 100.0f);
-		glm::mat4 view = camera_.GetViewMatrix();
-		lighting_shader_.setMat4("projection", projection);
-		lighting_shader_.setMat4("view", view);
+		glm::mat4 projection = glm::perspective(glm::radians(camera_->zoom_), (float)WINDOW_WIDTH / (float)WINDOW_HEIGHT, 0.1f, 100.0f);
+		glm::mat4 view = camera_->GetViewMatrix();
+		lighting_shader_->setMat4("projection", projection);
+		lighting_shader_->setMat4("view", view);
 
 		// world transformation
 		glm::mat4 model = glm::mat4(1.0f);
-		lighting_shader_.setMat4("model", model);
+		lighting_shader_->setMat4("model", model);
 
 		for (int i = 0; i < 1; i++) {
 			updateSpherePosition(deltaTime_);
@@ -243,13 +243,13 @@ void DemoSystem::processInput(GLFWwindow *window)
 	if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
 		glfwSetWindowShouldClose(window, true);
 	if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
-		camera_.ProcessKeyboard(FORWARD, deltaTime_);
+		camera_->ProcessKeyboard(FORWARD, deltaTime_);
 	if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
-		camera_.ProcessKeyboard(BACKWARD, deltaTime_);
+		camera_->ProcessKeyboard(BACKWARD, deltaTime_);
 	if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
-		camera_.ProcessKeyboard(LEFT, deltaTime_);
+		camera_->ProcessKeyboard(LEFT, deltaTime_);
 	if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
-		camera_.ProcessKeyboard(RIGHT, deltaTime_);
+		camera_->ProcessKeyboard(RIGHT, deltaTime_);
 }
 
 void DemoSystem::testPerformance(uint test_iters)
@@ -278,8 +278,8 @@ void DemoSystem::testPerformance(uint test_iters)
 void DemoSystem::updateShader()
 {
 	// be sure to activate shader when setting uniforms/drawing objects
-	lighting_shader_.use();
-	lighting_shader_.setVec3("viewPos", camera_.Position);
+	lighting_shader_->use();
+	lighting_shader_->setVec3("viewPos", camera_->camera_pos_);
 
 	/*
 	   Here we set all the uniforms for the 5/6 types of lights we have. We have to set them manually and index
@@ -288,53 +288,53 @@ void DemoSystem::updateShader()
 	   by using 'Uniform buffer objects', but that is something we'll discuss in the 'Advanced GLSL' tutorial.
 	*/
 	// directional light
-	lighting_shader_.setVec3("dirLight.direction", -0.2f, -1.0f, -0.3f);
-	lighting_shader_.setVec3("dirLight.ambient", 0.05f, 0.05f, 0.05f);
-	lighting_shader_.setVec3("dirLight.diffuse", 0.4f, 0.4f, 0.4f);
-	lighting_shader_.setVec3("dirLight.specular", 0.5f, 0.5f, 0.5f);
+	lighting_shader_->setVec3("dirLight.direction", -0.2f, -1.0f, -0.3f);
+	lighting_shader_->setVec3("dirLight.ambient", 0.05f, 0.05f, 0.05f);
+	lighting_shader_->setVec3("dirLight.diffuse", 0.4f, 0.4f, 0.4f);
+	lighting_shader_->setVec3("dirLight.specular", 0.5f, 0.5f, 0.5f);
 	// point light 1
-	lighting_shader_.setVec3("pointLights[0].position", pointLightPositions[0]);
-	lighting_shader_.setVec3("pointLights[0].ambient", 0.05f, 0.05f, 0.05f);
-	lighting_shader_.setVec3("pointLights[0].diffuse", 0.8f, 0.8f, 0.8f);
-	lighting_shader_.setVec3("pointLights[0].specular", 1.0f, 1.0f, 1.0f);
-	lighting_shader_.setFloat("pointLights[0].constant", 1.0f);
-	lighting_shader_.setFloat("pointLights[0].linear", 0.09);
-	lighting_shader_.setFloat("pointLights[0].quadratic", 0.032);
+	lighting_shader_->setVec3("pointLights[0].position", pointLightPositions[0]);
+	lighting_shader_->setVec3("pointLights[0].ambient", 0.05f, 0.05f, 0.05f);
+	lighting_shader_->setVec3("pointLights[0].diffuse", 0.8f, 0.8f, 0.8f);
+	lighting_shader_->setVec3("pointLights[0].specular", 1.0f, 1.0f, 1.0f);
+	lighting_shader_->setFloat("pointLights[0].constant", 1.0f);
+	lighting_shader_->setFloat("pointLights[0].linear", 0.09);
+	lighting_shader_->setFloat("pointLights[0].quadratic", 0.032);
 	// point light 2
-	lighting_shader_.setVec3("pointLights[1].position", pointLightPositions[1]);
-	lighting_shader_.setVec3("pointLights[1].ambient", 0.05f, 0.05f, 0.05f);
-	lighting_shader_.setVec3("pointLights[1].diffuse", 0.8f, 0.8f, 0.8f);
-	lighting_shader_.setVec3("pointLights[1].specular", 1.0f, 1.0f, 1.0f);
-	lighting_shader_.setFloat("pointLights[1].constant", 1.0f);
-	lighting_shader_.setFloat("pointLights[1].linear", 0.09);
-	lighting_shader_.setFloat("pointLights[1].quadratic", 0.032);
+	lighting_shader_->setVec3("pointLights[1].position", pointLightPositions[1]);
+	lighting_shader_->setVec3("pointLights[1].ambient", 0.05f, 0.05f, 0.05f);
+	lighting_shader_->setVec3("pointLights[1].diffuse", 0.8f, 0.8f, 0.8f);
+	lighting_shader_->setVec3("pointLights[1].specular", 1.0f, 1.0f, 1.0f);
+	lighting_shader_->setFloat("pointLights[1].constant", 1.0f);
+	lighting_shader_->setFloat("pointLights[1].linear", 0.09);
+	lighting_shader_->setFloat("pointLights[1].quadratic", 0.032);
 	// point light 3
-	lighting_shader_.setVec3("pointLights[2].position", pointLightPositions[2]);
-	lighting_shader_.setVec3("pointLights[2].ambient", 0.05f, 0.05f, 0.05f);
-	lighting_shader_.setVec3("pointLights[2].diffuse", 0.8f, 0.8f, 0.8f);
-	lighting_shader_.setVec3("pointLights[2].specular", 1.0f, 1.0f, 1.0f);
-	lighting_shader_.setFloat("pointLights[2].constant", 1.0f);
-	lighting_shader_.setFloat("pointLights[2].linear", 0.09);
-	lighting_shader_.setFloat("pointLights[2].quadratic", 0.032);
+	lighting_shader_->setVec3("pointLights[2].position", pointLightPositions[2]);
+	lighting_shader_->setVec3("pointLights[2].ambient", 0.05f, 0.05f, 0.05f);
+	lighting_shader_->setVec3("pointLights[2].diffuse", 0.8f, 0.8f, 0.8f);
+	lighting_shader_->setVec3("pointLights[2].specular", 1.0f, 1.0f, 1.0f);
+	lighting_shader_->setFloat("pointLights[2].constant", 1.0f);
+	lighting_shader_->setFloat("pointLights[2].linear", 0.09);
+	lighting_shader_->setFloat("pointLights[2].quadratic", 0.032);
 	// point light 4
-	lighting_shader_.setVec3("pointLights[3].position", pointLightPositions[3]);
-	lighting_shader_.setVec3("pointLights[3].ambient", 0.05f, 0.05f, 0.05f);
-	lighting_shader_.setVec3("pointLights[3].diffuse", 0.8f, 0.8f, 0.8f);
-	lighting_shader_.setVec3("pointLights[3].specular", 1.0f, 1.0f, 1.0f);
-	lighting_shader_.setFloat("pointLights[3].constant", 1.0f);
-	lighting_shader_.setFloat("pointLights[3].linear", 0.09);
-	lighting_shader_.setFloat("pointLights[3].quadratic", 0.032);
+	lighting_shader_->setVec3("pointLights[3].position", pointLightPositions[3]);
+	lighting_shader_->setVec3("pointLights[3].ambient", 0.05f, 0.05f, 0.05f);
+	lighting_shader_->setVec3("pointLights[3].diffuse", 0.8f, 0.8f, 0.8f);
+	lighting_shader_->setVec3("pointLights[3].specular", 1.0f, 1.0f, 1.0f);
+	lighting_shader_->setFloat("pointLights[3].constant", 1.0f);
+	lighting_shader_->setFloat("pointLights[3].linear", 0.09);
+	lighting_shader_->setFloat("pointLights[3].quadratic", 0.032);
 	// spotLight
-	lighting_shader_.setVec3("spotLight.position", camera_.Position);
-	lighting_shader_.setVec3("spotLight.direction", camera_.Front);
-	lighting_shader_.setVec3("spotLight.ambient", 0.0f, 0.0f, 0.0f);
-	lighting_shader_.setVec3("spotLight.diffuse", 1.0f, 1.0f, 1.0f);
-	lighting_shader_.setVec3("spotLight.specular", 1.0f, 1.0f, 1.0f);
-	lighting_shader_.setFloat("spotLight.constant", 1.0f);
-	lighting_shader_.setFloat("spotLight.linear", 0.09);
-	lighting_shader_.setFloat("spotLight.quadratic", 0.032);
-	lighting_shader_.setFloat("spotLight.cutOff", glm::cos(glm::radians(12.5f)));
-	lighting_shader_.setFloat("spotLight.outerCutOff", glm::cos(glm::radians(15.0f)));
+	lighting_shader_->setVec3("spotLight.position", camera_->camera_pos_);
+	lighting_shader_->setVec3("spotLight.direction", camera_->camera_front_);
+	lighting_shader_->setVec3("spotLight.ambient", 0.0f, 0.0f, 0.0f);
+	lighting_shader_->setVec3("spotLight.diffuse", 1.0f, 1.0f, 1.0f);
+	lighting_shader_->setVec3("spotLight.specular", 1.0f, 1.0f, 1.0f);
+	lighting_shader_->setFloat("spotLight.constant", 1.0f);
+	lighting_shader_->setFloat("spotLight.linear", 0.09);
+	lighting_shader_->setFloat("spotLight.quadratic", 0.032);
+	lighting_shader_->setFloat("spotLight.cutOff", glm::cos(glm::radians(12.5f)));
+	lighting_shader_->setFloat("spotLight.outerCutOff", glm::cos(glm::radians(15.0f)));
 }
 
 void DemoSystem::updateSpherePosition(float delta_time)
@@ -347,7 +347,7 @@ void DemoSystem::updateSpherePosition(float delta_time)
 	float* updated_pos = engine_->outputPos();
 
 	float currentFrame2 = glfwGetTime();
-	printf("%.6f", currentFrame2 - currentFrame1);
+	//printf("%.6f", currentFrame2 - currentFrame1);
 
 	uint *type = engine_->getSphereType();
 	// draw spheres
@@ -361,8 +361,8 @@ void DemoSystem::updateSpherePosition(float delta_time)
 		model = glm::translate(model, glm::vec3(updated_pos[i_x3], updated_pos[i_x3 +1], updated_pos[i_x3 +2]));
 		float angle = 20.0f * i;
 		model = glm::rotate(model, glm::radians(angle), glm::vec3(1.0f, 0.3f, 0.5f));
-		lighting_shader_.setMat4("model", model);
-		lighting_shader_.setFloat("radius", PROTOTYPES[type[i]].radius);
+		lighting_shader_->setMat4("model", model);
+		lighting_shader_->setFloat("radius", PROTOTYPES[type[i]].radius);
 		glDrawElements(GL_TRIANGLE_STRIP, sphere_index_count_, GL_UNSIGNED_INT, 0);
 	}
 	//system("pause");
@@ -394,12 +394,12 @@ void DemoSystem::mouse_callback(double xpos, double ypos)
 	lastX_ = xpos;
 	lastY_ = ypos;
 
-	camera_.ProcessMouseMovement(xoffset, yoffset);
+	camera_->ProcessMouseMovement(xoffset, yoffset);
 }
 
 // glfw: whenever the mouse scroll wheel scrolls, this callback is called
 // ----------------------------------------------------------------------
 void DemoSystem::scroll_callback(double xoffset, double yoffset)
 {
-	camera_.ProcessMouseScroll(yoffset);
+	camera_->ProcessMouseScroll(yoffset);
 }
