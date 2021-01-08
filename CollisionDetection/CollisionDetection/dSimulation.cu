@@ -21,7 +21,9 @@
 #include "thrust/device_ptr.h"
 #include "thrust/sort.h"
 
-#include "particles_kernel_impl.cuh"
+#include "global.h"
+#include "dSimulationKernel.cuh"
+
 
 extern "C" {
     void cudaInit(int argc, char **argv) {
@@ -31,7 +33,7 @@ extern "C" {
         devID = findCudaDevice(argc, (const char **)argv);
 
         if (devID < 0) {
-            printf("No CUDA Capable devices found, exiting...\n");
+            printf("No CUDA Capable devices found, please switch to CPU mode, exiting...\n");
             exit(EXIT_SUCCESS);
         }
     }
@@ -63,10 +65,10 @@ extern "C" {
 
     void dSetupSimulation(
 		SimulationEnv *h_env, 
-		SimulationSphereStats *h_stats) {
+		SimulationSphereProto *h_protos) {
         // copy parameters to constant memory
         checkCudaErrors(cudaMemcpyToSymbol(d_env, h_env, sizeof(SimulationEnv)));
-		checkCudaErrors(cudaMemcpyToSymbol(d_stats, h_stats, sizeof(SimulationSphereStats)));
+		checkCudaErrors(cudaMemcpyToSymbol(d_protos, h_protos, sizeof(SimulationSphereProto)));
     }
 
     //Round a / b to nearest higher integer value

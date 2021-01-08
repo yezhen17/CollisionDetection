@@ -52,6 +52,8 @@ in vec3 Normal;
 in vec2 TexCoords;
 
 uniform bool HasTexture;
+uniform bool HasSpotLight;
+uniform bool HasSpecularMap;
 uniform vec3 viewPos;
 uniform DirLight dirLight;
 uniform PointLight pointLights[NR_POINT_LIGHTS];
@@ -81,7 +83,8 @@ void main()
     for(int i = 0; i < NR_POINT_LIGHTS; i++)
         result += CalcPointLight(pointLights[i], norm, FragPos, viewDir);    
     // phase 3: spot light
-    // result += CalcSpotLight(spotLight, norm, FragPos, viewDir);    
+    if(HasSpotLight)
+        result += CalcSpotLight(spotLight, norm, FragPos, viewDir);    
     
     FragColor = vec4(result, 1.0);
 }
@@ -101,7 +104,10 @@ vec3 CalcDirLight(DirLight light, vec3 normal, vec3 viewDir)
     {
         ambient = light.ambient * vec3(texture(material.diffuseMap, TexCoords));
         diffuse = light.diffuse * diff * vec3(texture(material.diffuseMap, TexCoords));
-        specular = vec3(0.0, 0.0, 0.0);// light.specular * spec * vec3(texture(material.diffuseMap, TexCoords));
+        if (HasSpecularMap)
+            light.specular * spec * vec3(texture(material.diffuseMap, TexCoords));
+        else
+            specular = vec3(0.0, 0.0, 0.0);
     }
     else
     {
@@ -130,7 +136,10 @@ vec3 CalcPointLight(PointLight light, vec3 normal, vec3 fragPos, vec3 viewDir)
     {
         ambient = light.ambient * vec3(texture(material.diffuseMap, TexCoords));
         diffuse = light.diffuse * diff * vec3(texture(material.diffuseMap, TexCoords));
-        specular = vec3(0.0, 0.0, 0.0);// light.specular * spec * vec3(texture(material.diffuseMap, TexCoords));
+        if (HasSpecularMap)
+            light.specular * spec * vec3(texture(material.diffuseMap, TexCoords));
+        else
+            specular = vec3(0.0, 0.0, 0.0);
     }
     else
     {
@@ -166,7 +175,10 @@ vec3 CalcSpotLight(SpotLight light, vec3 normal, vec3 fragPos, vec3 viewDir)
     {
         ambient = light.ambient * vec3(texture(material.diffuseMap, TexCoords));
         diffuse = light.diffuse * diff * vec3(texture(material.diffuseMap, TexCoords));
-        specular = vec3(0.0, 0.0, 0.0);// light.specular * spec * vec3(texture(material.diffuseMap, TexCoords));
+        if (HasSpecularMap)
+            light.specular * spec * vec3(texture(material.diffuseMap, TexCoords));
+        else
+            specular = vec3(0.0, 0.0, 0.0);
     }
     else
     {

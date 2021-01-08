@@ -1,20 +1,27 @@
+/*
+ * This header file defines the settings as constants
+ */
+
 #ifndef GLOBAL_H
 #define GLOBAL_H
 
 typedef unsigned int uint;
+typedef unsigned char uchar;
 
-#define GRID_SIZE       64
-#define SPHERE_NUM   10000
-#define FRAME_RATE 25
+const float MOUSE_SPEED = 2.5f;
+const float ZOOM_DEFAULT = 20.0f;
 
-#define GPU_MODE true
+const uint GRID_SIZE = 64;
+const uint SPHERE_NUM = 1000;
+const uint FRAME_RATE = 25;
 
-#define WINDOW_WIDTH 800
-#define WINDOW_HEIGHT 640
+const bool GPU_MODE = true;
 
-const uint SPHERE_SEGMENTS = 16;
-const uint X_SEGMENTS = SPHERE_SEGMENTS;
-const uint Y_SEGMENTS = SPHERE_SEGMENTS;
+const uint WINDOW_WIDTH = 1600;
+const uint WINDOW_HEIGHT = 900;
+
+const uint HORIZONTAL_FRAGMENT_NUM = 16;
+const uint VERTICAL_FRAGMENT_NUM = 16;
 
 const uint PROTOTYPE_NUM = 7;
 

@@ -1,14 +1,20 @@
+/*
+ * This file provides the CPU (serial) implementation of the collision detection algorithm based on spatial subdivision
+ */
+
 #ifndef HSIMULATION_H
 #define HSIMULATION_H
 
-#include "global.h"
-#include "particles_kernel.cuh"
-#include "helper_math.h"
 #include <algorithm>
+#include <helper_math.h>
 #include <glm/glm.hpp>
 
+#include "global.h"
+#include "environment.h"
+#include "sphere.h"
+
 SimulationEnv *h_env; // Environment parameters
-SimulationSphereStats *h_stats; // Sphere parameters (fixed throughout simulation)
+SimulationSphereProto *h_protos; // Sphere parameters (fixed throughout simulation)
 
 int3 h_neighboorhood_3[27] = {
 	-1, -1, -1,
@@ -40,84 +46,17 @@ int3 h_neighboorhood_3[27] = {
 	 1,  1,  1,
 };
 
-void hSetupSimulation(SimulationEnv *env, SimulationSphereStats *stats) {
+void hSetupSimulation(SimulationEnv *env, SimulationSphereProto *stats) {
 	h_env = env;
-	h_stats = stats;
-}
-
-void hUpdateDynamics(
-	float3 *pos_s,
-	float3 *velo_s,
-	float3 *velo_delta_s,
-	uint *types,
-	float elapse,
-	uint sphere_num) {
-	for (uint i = 0; i < sphere_num; ++i)
-	{
-		float3 pos = pos_s[i];
-		float3 velo = velo_s[i];
-		float3 velo_delta = velo_delta_s[i];
-		uint type = types[i];
-		float radius = h_stats->radii[type];
-
-		velo += velo_delta;
-		velo += h_env->gravity * elapse;
-		velo *= h_env->drag;
-
-		// new position = old position + velocity * deltaTime
-		pos += velo * elapse;
-
-		// set this to zero to disable collisions with cube sides
-#if 1
-
-		if (pos.x > 1.0f - radius)
-		{
-			pos.x = 1.0f - radius;
-			velo.x *= h_env->boundary_damping;
-		}
-
-		if (pos.x < -1.0f + radius)
-		{
-			pos.x = -1.0f + radius;
-			velo.x *= h_env->boundary_damping;
-		}
-
-		if (pos.y > 1.0f - radius)
-		{
-			pos.y = 1.0f - radius;
-			velo.y *= h_env->boundary_damping;
-		}
-
-		if (pos.z > 1.0f - radius)
-		{
-			pos.z = 1.0f - radius;
-			velo.z *= h_env->boundary_damping;
-		}
-
-		if (pos.z < -1.0f + radius)
-		{
-			pos.z = -1.0f + radius;
-			velo.z *= h_env->boundary_damping;
-		}
-
-#endif
-
-		if (pos.y < -1.0f + radius)
-		{
-			pos.y = -1.0f + radius;
-			velo.y *= h_env->boundary_damping;
-		}
-		pos_s[i] = pos;
-		velo_s[i] = velo;
-	}
+	h_protos = stats;
 }
 
 // calculate position in uniform grid
 int3 hConvertWorldPosToGrid(float3 world_pos) {
 	int3 grid_pos;
-	grid_pos.x = floor((world_pos.x - h_env->worldOrigin.x) / h_env->cell_size.x);
-	grid_pos.y = floor((world_pos.y - h_env->worldOrigin.y) / h_env->cell_size.y);
-	grid_pos.z = floor((world_pos.z - h_env->worldOrigin.z) / h_env->cell_size.z);
+	grid_pos.x = floor(world_pos.x / h_env->cell_size.x);
+	grid_pos.y = floor(world_pos.y / h_env->cell_size.y);
+	grid_pos.z = floor(world_pos.z / h_env->cell_size.z);
 	return grid_pos;
 }
 
@@ -127,8 +66,6 @@ uint hHashFunc(int3 grid_pos) {
 	grid_pos.y = grid_pos.y & (h_env->grid_size.y - 1);
 	grid_pos.z = grid_pos.z & (h_env->grid_size.z - 1);
 	return grid_pos.x + (grid_pos.y << h_env->grid_exp.x) + (grid_pos.z << (h_env->grid_exp.x + h_env->grid_exp.y));
-
-	// return __umul24(__umul24(gridPos.z, d_env.grid_size.y), d_env.grid_size.x) + __umul24(gridPos.y, d_env.grid_size.x) + gridPos.x;
 }
 
  void hHashifyAndSort(
@@ -160,26 +97,21 @@ uint hHashFunc(int3 grid_pos) {
 }
 
  void hCollectCells(
-	 uint   *cell_start,        // output: cell start index
-	 uint   *cell_end,          // output: cell end index
+	 uint   *cell_start, 
+	 uint   *cell_end,
 	 uint   *hashes,
 	 uint sphere_num,
 	 uint cell_num) {
 	 memset(cell_start, (unsigned char) 0xff, cell_num * sizeof(uint));
-	 for (uint i = 0; i < sphere_num; ++i)
-	 {
+	 for (uint i = 0; i < sphere_num; ++i) {
 		 uint hash = hashes[i];
-		 if (i == 0)
-		 {
+		 if (i == 0) {
 			 cell_start[hash] = i;
-		 }
-		 else if (hash != hashes[i - 1])
-		 {
+		 } else if (hash != hashes[i - 1]) {
 			 cell_start[hash] = i;
 			 cell_end[hashes[i - 1]] = i;
 		 }
-		 if (i == h_env->sphere_num - 1)
-		 {
+		 if (i == h_env->sphere_num - 1) {
 			 cell_end[hash] = i + 1;
 		 }
 	 }	
@@ -247,8 +179,8 @@ uint hHashFunc(int3 grid_pos) {
 		 float3 pos_c = pos_s[index_origin_c];
 		 float3 velo_c = velo_s[index_origin_c];
 		 uint type_c = types[index_origin_c];
-		 float radius_c = h_stats->radii[type_c];
-		 float mass_c = h_stats->masses[type_c];
+		 float radius_c = h_protos->radii[type_c];
+		 float mass_c = h_protos->masses[type_c];
 		 // get address in grid
 		 int3 grid_pos_c = hConvertWorldPosToGrid(pos_c);
 
@@ -273,8 +205,8 @@ uint hHashFunc(int3 grid_pos) {
 						 float3 pos_n = pos_s[index_origin_n];
 						 float3 vel_n = velo_s[index_origin_n];
 						 uint type_n = types[index_origin_n];
-						 float radius_n = h_stats->radii[type_n];
-						 float mass_n = h_stats->masses[type_n];
+						 float radius_n = h_protos->radii[type_n];
+						 float mass_n = h_protos->masses[type_n];
 						 force += hCollisionAtomic(pos_c, pos_n, velo_c, vel_n, radius_c, radius_n, mass_c, mass_n);
 					 }
 				 }
@@ -284,7 +216,58 @@ uint hHashFunc(int3 grid_pos) {
 		 // write velocity change
 		 velo_delta_s[index_origin_c] = force / mass_c;
 	 }
-	
+ }
+
+ void hUpdateDynamics(
+	 float3 *pos_s,
+	 float3 *velo_s,
+	 float3 *velo_delta_s,
+	 uint *types,
+	 float elapse,
+	 uint sphere_num) {
+	 for (uint i = 0; i < sphere_num; ++i) {
+		 float3 pos = pos_s[i];
+		 float3 velo = velo_s[i];
+		 float3 velo_delta = velo_delta_s[i];
+		 uint type = types[i];
+		 float radius = h_protos->radii[type];
+
+		 velo += velo_delta;
+		 velo += h_env->gravity * elapse;
+		 velo *= h_env->drag;
+
+		 // new position = old position + velocity * deltaTime
+		 pos += velo * elapse;
+
+		 float3 max_corner = h_env->max_corner;
+		 float3 min_corner = h_env->min_corner;
+		 if (pos.x > max_corner.x - radius) {
+			 pos.x = max_corner.x - radius;
+			 velo.x *= h_env->boundary_damping;
+		 }
+		 if (pos.x < min_corner.x + radius) {
+			 pos.x = min_corner.x + radius;
+			 velo.x *= h_env->boundary_damping;
+		 }
+		 if (pos.y > max_corner.y - radius) {
+			 pos.y = max_corner.y - radius;
+			 velo.y *= h_env->boundary_damping;
+		 }
+		 if (pos.y < min_corner.y + radius) {
+			 pos.y = min_corner.y + radius;
+			 velo.y *= h_env->boundary_damping;
+		 }
+		 if (pos.z > max_corner.z - radius) {
+			 pos.z = max_corner.z - radius;
+			 velo.z *= h_env->boundary_damping;
+		 }
+		 if (pos.z < min_corner.z + radius) {
+			 pos.z = min_corner.z + radius;
+			 velo.z *= h_env->boundary_damping;
+		 }
+		 pos_s[i] = pos;
+		 velo_s[i] = velo;
+	 }
  }
 
 #endif // !HSIMULATION_H

@@ -1,23 +1,40 @@
+/*
+ * This file defines a physics engine that supports simulation based on physics rules
+ */
+
 #ifndef PHYSICSENGINE_H
 #define PHYSICSENGINE_H
 
-# include "global.h"
+#include <glm/glm.hpp>
 #include <helper_functions.h>
-#include "particles_kernel.cuh"
-#include "vector_functions.h"
+#include <vector_functions.h>
+
+# include "global.h"
+#include "sphere.h"
+#include "environment.h"
 
 class PhysicsEngine {
 public:
-	PhysicsEngine(uint sphere_num= SPHERE_NUM, uint grid_size=GRID_SIZE, bool gpu_mode= GPU_MODE);
+	PhysicsEngine(uint sphere_num, 
+		glm::vec3 origin, 
+		glm::vec3 room_size, 
+		uint grid_size=GRID_SIZE, 
+		bool gpu_mode= GPU_MODE);
+
 	~PhysicsEngine();
-	void initRenderer();
+
+	// output  updated sphere positions
 	float* outputPos();
-	void update(float deltaTime);
+
+	// simulate the collision and motion of all spheres in given amount of time (elapse) 
+	void update(float elapse);
 
 protected:
-	inline void createArrayOnGPU();
+	// initialize the type, position and velocity of all spheres
+	void initSpheres();
 
 protected:
+	// use GPU for calculation or not
 	bool gpu_mode_;
 
 	uint sphere_num_;
@@ -50,7 +67,7 @@ protected:
 	uint   m_gridSortBits;
 
 	SimulationEnv env_;
-	SimulationSphereStats stats_;
+	SimulationSphereProto protos_;
 	uint3 m_gridSize;
 	uint3 grid_exp_;
 	uint cell_num_;

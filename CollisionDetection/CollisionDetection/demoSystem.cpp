@@ -3,31 +3,26 @@
  */
 
 #include <iostream>
-#include <glad/glad.h>
-#include <GLFW/glfw3.h>
-
-#include <glm/glm.hpp>
-#include <glm/gtc/matrix_transform.hpp>
-#include <glm/gtc/type_ptr.hpp>
-
-#include "shader.h"
-#include "camera.h"
-#include <stb_image.h>
-
 #include <windows.h>
 #include <windef.h>
 
-#include "sphere.h"
+#include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtc/type_ptr.hpp>
+
 #include "demoSystem.h"
 
-DemoSystem::DemoSystem(bool render_mode, bool use_spotlight, bool immersive_mode, uint frame_rate, uint sphere_num):
+DemoSystem::DemoSystem(bool render_mode, bool use_spotlight, bool immersive_mode, float simulation_timestep,
+	uint frame_rate, uint sphere_num, glm::vec3 origin, glm::vec3 room_size):
 	render_mode_(render_mode),
 	use_spotlight_(use_spotlight),
 	immersive_mode_(immersive_mode),
+	simulation_timestep_(simulation_timestep),
 	frame_rate_(frame_rate),
 	loop_duration_(1.0f / frame_rate),
-	sphere_num_(sphere_num) {
-	engine_ = new PhysicsEngine();
+	sphere_num_(sphere_num),
+	origin_(origin),
+	room_size_(room_size) {
+	engine_ = new PhysicsEngine(sphere_num, origin, room_size);
 }
 
 DemoSystem::~DemoSystem() {
@@ -35,26 +30,13 @@ DemoSystem::~DemoSystem() {
 }
 
 void DemoSystem::startDemo() {
-	initSystem();
 	if (render_mode_) {
 		initWindow();
-		initRenderer();
+		initSpheres();
 		mainLoop();
 	} else {
 		testPerformance();
 	}
-}
-
-void DemoSystem::initSystem() {
-	// camera
-	camera_ = new Camera(5, -20, 225);
-	last_mouse_x_ = WINDOW_WIDTH / 2.0f;
-	last_mouse_y_ = WINDOW_HEIGHT / 2.0f;
-	first_mouse_ = true;
-
-	// timing
-	deltaTime_ = 0.0f;
-	lastFrame_ = 0.0f;
 }
 
 void DemoSystem::initWindow() {
@@ -99,9 +81,13 @@ void DemoSystem::initWindow() {
 		// tell glfw to capture our mouse
 		glfwSetInputMode(window_, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 	}
+
+	last_mouse_x_ = WINDOW_WIDTH * 0.5f;
+	last_mouse_y_ = WINDOW_HEIGHT * 0.5f;
+	first_mouse_ = true;
 }
 
-void DemoSystem::initRenderer() {
+void DemoSystem::initSpheres() {
 	// glad: load all OpenGL function pointers
 	if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress)) {
 		std::cout << "Failed to initialize GLAD" << std::endl;
@@ -111,95 +97,95 @@ void DemoSystem::initRenderer() {
 	// configure global opengl state
 	glEnable(GL_DEPTH_TEST);
 
-	std::vector<glm::vec3> positions;
-	std::vector<glm::vec3> normals;
-	std::vector<uint> indices;
+	camera_ = new Camera(glm::vec3(0.5f, 0.5f, 0.5f), 5, -20, 225);
+
+	// initialize vertex arrays and buffers for rendering spheres 
+	std::vector<glm::vec3> vertices;
+	std::vector<glm::vec3> vertex_normals;
+	std::vector<uint> vertex_indices;
 	glGenVertexArrays(1, &sphere_VAO_);
 	glGenBuffers(1, &sphere_VBO_);
 	glGenBuffers(1, &sphere_EBO_);
 
-	for (unsigned int y = 0; y <= Y_SEGMENTS; ++y) {
-		for (unsigned int x = 0; x <= X_SEGMENTS; ++x) {
-			float xSegment = (float)x / (float)X_SEGMENTS;
-			float ySegment = (float)y / (float)Y_SEGMENTS;
+	for (unsigned int y = 0; y <= VERTICAL_FRAGMENT_NUM; ++y) {
+		for (unsigned int x = 0; x <= HORIZONTAL_FRAGMENT_NUM; ++x) {
+			float xSegment = (float)x / (float)HORIZONTAL_FRAGMENT_NUM;
+			float ySegment = (float)y / (float)VERTICAL_FRAGMENT_NUM;
 			float xPos = std::cos(xSegment * 2.0f * PI) * std::sin(ySegment * PI);
 			float yPos = std::cos(ySegment * PI);
 			float zPos = std::sin(xSegment * 2.0f * PI) * std::sin(ySegment * PI);
-			positions.push_back(glm::vec3(xPos, yPos, zPos));
-			normals.push_back(glm::vec3(xPos, yPos, zPos));
+			vertices.push_back(glm::vec3(xPos, yPos, zPos));
+			vertex_normals.push_back(glm::vec3(xPos, yPos, zPos));
 		}
 	}
 	bool odd_row = false;
-	for (unsigned int y = 0; y < Y_SEGMENTS; ++y) {
+	for (unsigned int y = 0; y < VERTICAL_FRAGMENT_NUM; ++y) {
 		if (!odd_row) {
-			for (unsigned int x = 0; x <= X_SEGMENTS; ++x) {
-				indices.push_back(y * (X_SEGMENTS + 1) + x);
-				indices.push_back((y + 1) * (X_SEGMENTS + 1) + x);
+			for (unsigned int x = 0; x <= HORIZONTAL_FRAGMENT_NUM; ++x) {
+				vertex_indices.push_back(y * (HORIZONTAL_FRAGMENT_NUM + 1) + x);
+				vertex_indices.push_back((y + 1) * (HORIZONTAL_FRAGMENT_NUM + 1) + x);
 			}
 		} else {
-			for (int x = X_SEGMENTS; x >= 0; --x) {
-				indices.push_back((y + 1) * (X_SEGMENTS + 1) + x);
-				indices.push_back(y * (X_SEGMENTS + 1) + x);
+			for (int x = HORIZONTAL_FRAGMENT_NUM; x >= 0; --x) {
+				vertex_indices.push_back((y + 1) * (HORIZONTAL_FRAGMENT_NUM + 1) + x);
+				vertex_indices.push_back(y * (HORIZONTAL_FRAGMENT_NUM + 1) + x);
 			}
 		}
 		odd_row = !odd_row;
 	}
 
-	sphere_index_count_ = indices.size();
+	sphere_index_count_ = vertex_indices.size();
 	std::vector<float> sphere_data;
-	for (std::size_t i = 0; i < positions.size(); ++i) {
-		sphere_data.push_back(positions[i].x);
-		sphere_data.push_back(positions[i].y);
-		sphere_data.push_back(positions[i].z);
-		if (normals.size() > 0) {
-			sphere_data.push_back(normals[i].x);
-			sphere_data.push_back(normals[i].y);
-			sphere_data.push_back(normals[i].z);
+	for (std::size_t i = 0; i < vertices.size(); ++i) {
+		sphere_data.push_back(vertices[i].x);
+		sphere_data.push_back(vertices[i].y);
+		sphere_data.push_back(vertices[i].z);
+		if (vertex_normals.size() > 0) {
+			sphere_data.push_back(vertex_normals[i].x);
+			sphere_data.push_back(vertex_normals[i].y);
+			sphere_data.push_back(vertex_normals[i].z);
 		}
 	}
+
 	glBindVertexArray(sphere_VAO_);
 	glBindBuffer(GL_ARRAY_BUFFER, sphere_VBO_);
 	glBufferData(GL_ARRAY_BUFFER, sphere_data.size() * sizeof(float), &sphere_data[0], GL_STATIC_DRAW);
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, sphere_EBO_);
-	glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices.size() * sizeof(unsigned int), &indices[0], GL_STATIC_DRAW);
+	glBufferData(GL_ELEMENT_ARRAY_BUFFER, vertex_indices.size() * sizeof(unsigned int), &vertex_indices[0], GL_STATIC_DRAW);
 	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)0);
 	glEnableVertexAttribArray(0);
 	glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)(3 * sizeof(float)));
 	glEnableVertexAttribArray(1);
 
-	// set up vertex data (and buffer(s)) and configure vertex attributes
-	// ------------------------------------------------------------------
-	float wall_vertices[] = {
-		// positions          // colors           // texture coords
-		 0.5f,  0.5f, 0.0f,   1.0f, 0.0f, 0.0f,   1.0f, 1.0f, // top right
-		 0.5f, -0.5f, 0.0f,   0.0f, 1.0f, 0.0f,   1.0f, 0.0f, // bottom right
-		-0.5f, -0.5f, 0.0f,   0.0f, 0.0f, 1.0f,   0.0f, 0.0f, // bottom left
-		-0.5f,  0.5f, 0.0f,   1.0f, 1.0f, 0.0f,   0.0f, 1.0f  // top left 
+	// initialize vertex arrays and buffers for rendering background (walls and floor)
+	float face_vertices[] = {
+		// vertices           // normals          // texture coords
+		 1.0f, 1.0f, 0.0f,   0.0f, 0.0f, 1.0f,   1.0f, 1.0f, // top right
+		 1.0f, 0.0f, 0.0f,   0.0f, 0.0f, 1.0f,   1.0f, 0.0f, // bottom right
+		 0.0f, 0.0f, 0.0f,   0.0f, 0.0f, 1.0f,   0.0f, 0.0f, // bottom left
+		 0.0f, 1.0f, 0.0f,   0.0f, 0.0f, 1.0f,   0.0f, 1.0f  // top left 
 	};
-	uint wall_indices[] = {
+	uint face_indices[] = {
 		0, 1, 3, // first triangle
 		1, 2, 3  // second triangle
 	};
 
-	glGenVertexArrays(1, &wall_VAO_);
-	glGenBuffers(1, &wall_VBO_);
-	glGenBuffers(1, &wall_EBO_);
+	glGenVertexArrays(1, &background_VAO_);
+	glGenBuffers(1, &background_VBO_);
+	glGenBuffers(1, &background_EBO_);
 
-	glBindVertexArray(wall_VAO_);
+	glBindVertexArray(background_VAO_);
 
-	glBindBuffer(GL_ARRAY_BUFFER, wall_VBO_);
-	glBufferData(GL_ARRAY_BUFFER, sizeof(wall_vertices), wall_vertices, GL_STATIC_DRAW);
+	glBindBuffer(GL_ARRAY_BUFFER, background_VBO_);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(face_vertices), face_vertices, GL_STATIC_DRAW);
 
-	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, wall_EBO_);
-	glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(wall_indices), wall_indices, GL_STATIC_DRAW);
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, background_EBO_);
+	glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(face_indices), face_indices, GL_STATIC_DRAW);
 
-	// position attribute
 	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)0);
 	glEnableVertexAttribArray(0);
-	// color attribute
 	glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(3 * sizeof(float)));
 	glEnableVertexAttribArray(1);
-	// texture coord attribute
 	glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(6 * sizeof(float)));
 	glEnableVertexAttribArray(2);
 
@@ -210,52 +196,67 @@ void DemoSystem::initRenderer() {
    by using 'Uniform buffer objects', but that is something we'll discuss in the 'Advanced GLSL' tutorial.
 */
 
+	// initialize model matrices for rendering background
+	model_matrices_ = { };
+	glm::mat4 model_base = glm::mat4(1.0f);
+	model_base = glm::translate(model_base, origin_);
+	
+	glm::mat4 model_right = model_base;
+	glm::mat4 model_left = glm::translate(model_base, glm::vec3(0.0f, 0.0f, room_size_.z));
+	glm::mat4 model_bottom = model_left;
+	//model_right = glm::scale(model_right, glm::vec3(1.0f));
+	model_left = glm::rotate(model_left, glm::radians(90.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+	model_bottom = glm::rotate(model_bottom, glm::radians(-90.0f), glm::vec3(1.0f, 0.0f, 0.0f));
+	model_matrices_.push_back(model_right);
+	model_matrices_.push_back(model_left);
+	model_matrices_.push_back(model_bottom);
+
+	// initialize pointlight positions
 	pointlight_positions_ = {
-		glm::vec3(0.0f,  1.5f,  0.0f),
+		glm::vec3(0.5f,  1.2f,  0.5f),
 	};
 
-	wall_positions_ = {
-		glm::vec3(-1.0f,  0.0f,  -1.0f),
-		glm::vec3(-1.0f,  2.0f,  -1.0f),
-		glm::vec3(-1.0f,  1.0f,  -1.0f),
-	};
-
+	// load textures and bind
 	wall_texture_ = loadTexture("../resources/textures/brickwall.jpg");
 	floor_texture_ = loadTexture("../resources/textures/wood.png");
-	wall_shader_ = initShader("../shaderPrograms/background.vs", "../shaderPrograms/phong.fs", wall_texture_);
-	sphere_shader_ = initShader("../shaderPrograms/sphere.vs", "../shaderPrograms/phong.fs", 0);
+	glActiveTexture(GL_TEXTURE0);
+	glBindTexture(GL_TEXTURE_2D, wall_texture_);
+	glActiveTexture(GL_TEXTURE1);
+	glBindTexture(GL_TEXTURE_2D, floor_texture_);
+
+	// initialize shaders (background and sphere)
+	background_shader_ = initShader("../shaderPrograms/background.vs", "../shaderPrograms/phong.fs", wall_texture_, false);
+	sphere_shader_ = initShader("../shaderPrograms/sphere.vs", "../shaderPrograms/phong.fs", 0, true);
 }
 
-Shader *DemoSystem::initShader(char const * vs_path, char const * fs_path, uint texture_id)
+Shader *DemoSystem::initShader(char const * vs_path, char const * fs_path, uint texture_id, bool has_specular_map)
 {
 	Shader *shader = new Shader();
 	// shader configuration
 	shader->loadProgram(vs_path, fs_path);
 	shader->use();
-	shader->setFloat("material.shininess", 32.0f);
-	shader->setVec3("material.ambient", 0.0f, 0.1f, 0.06f);
-	shader->setVec3("material.diffuse", 0.0f, 0.50980392f, 0.50980392f);
-	shader->setVec3("material.specular", 0.50196078f, 0.50196078f, 0.50196078f);
 
 	// point light 1
 	shader->setVec3("pointLights[0].position", pointlight_positions_[0]);
-	shader->setVec3("pointLights[0].ambient", 0.1f, 0.1f, 0.1f);
-	shader->setVec3("pointLights[0].diffuse", 0.8f, 0.8f, 0.8f);
+	shader->setVec3("pointLights[0].ambient", 0.2f, 0.2f, 0.2f);
+	shader->setVec3("pointLights[0].diffuse", 0.6f, 0.6f, 0.6f);
 	shader->setVec3("pointLights[0].specular", 1.0f, 1.0f, 1.0f);
 	shader->setFloat("pointLights[0].constant", 1.0f);
-	shader->setFloat("pointLights[0].linear", 0.09);
-	shader->setFloat("pointLights[0].quadratic", 0.032);
+	shader->setFloat("pointLights[0].linear", 0.09f);// 0.09);
+	shader->setFloat("pointLights[0].quadratic", 0.032f);// 0.032);
 
 	// directional light
 	//shader->setVec3("dirLight.direction", -0.2f, -1.0f, -0.3f);
-	shader->setVec3("dirLight.direction", 0.0f, -1.0f, 0.0f);
-	shader->setVec3("dirLight.ambient", 0.1f, 0.1f, 0.1f);
-	shader->setVec3("dirLight.diffuse", 0.7f, 0.7f, 0.7f);
+	shader->setVec3("dirLight.direction", -1.0f, -1.0f, -1.0f);
+	shader->setVec3("dirLight.ambient", 0.2f, 0.2f, 0.2f);
+	shader->setVec3("dirLight.diffuse", 0.3f, 0.3f, 0.3f);
 	shader->setVec3("dirLight.specular", 0.5f, 0.5f, 0.5f);
 
 	bool has_texture = texture_id != 0;
 	std::cout << std::endl << has_texture;
 	shader->setBool("HasTexture", has_texture);
+	shader->setBool("HasSpecularMap", has_specular_map);
+	shader->setBool("HasSpotLight", use_spotlight_);
 
 	if (use_spotlight_) {
 		// spotlight from camera
@@ -270,7 +271,7 @@ Shader *DemoSystem::initShader(char const * vs_path, char const * fs_path, uint 
 	}
 
 	if (has_texture) {
-		shader->setInt("material.diffuseMap", texture_id);
+		shader->setInt("material.diffuseMap", texture_id - 1);
 	}
 
 	return shader;
@@ -278,15 +279,9 @@ Shader *DemoSystem::initShader(char const * vs_path, char const * fs_path, uint 
 
 void DemoSystem::mainLoop() {
 	while (!glfwWindowShouldClose(window_)) {
-		// per-frame time logic
-		// --------------------
 		float time_start = glfwGetTime();
-		/*deltaTime_ = currentFrame - lastFrame_;
-		lastFrame_ = currentFrame;*/
 
-		//printf("%.6f", deltaTime_);
-		//Sleep(200);
-
+		// handle keyboard input
 		processInput(window_);
 
 		// render
@@ -298,81 +293,65 @@ void DemoSystem::mainLoop() {
 
 		glfwSwapBuffers(window_);
 		glfwPollEvents();
+
 		float time_end = glfwGetTime();
 		float time_elapse = time_end - time_start;
 		Sleep(time_elapse * 1000);
 	}
 
 	glDeleteVertexArrays(1, &sphere_VAO_);
-	glDeleteVertexArrays(1, &wall_VAO_);
+	glDeleteVertexArrays(1, &background_VAO_);
 	glDeleteBuffers(1, &sphere_VBO_);
 	glDeleteBuffers(1, &sphere_EBO_);
-	glDeleteBuffers(1, &wall_VBO_);
-	glDeleteBuffers(1, &wall_EBO_);
+	glDeleteBuffers(1, &background_VBO_);
+	glDeleteBuffers(1, &background_EBO_);
 
 	glfwTerminate();
 }
 
-
-
 void DemoSystem::renderBackground() {
-	// bind textures on corresponding texture units
-	glActiveTexture(GL_TEXTURE1);
-	glBindTexture(GL_TEXTURE_2D, wall_texture_);
-	wall_shader_->use();
-	updateViewpoint(wall_shader_);
-	glBindVertexArray(wall_VAO_);
-	
-	for (unsigned int i = 0; i < 2; i++) {
-		glm::mat4 model = glm::mat4(1.0f);
-		model = glm::translate(model, wall_positions_[i]);
-		model = glm::scale(model, glm::vec3(0.5f)); // Make it a smaller cube
-		wall_shader_->setMat4("model", model);
-		// glDrawArrays(GL_TRIANGLES, 0, 36);
-		glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, (void *)0);
-		/*wall_shader_->setInt("material.diffuseMap", floor_texture_);
-		glActiveTexture(GL_TEXTURE2);
-		glBindTexture(GL_TEXTURE_2D, floor_texture_);
-		
-		glDrawElements(GL_TRIANGLES, 3, GL_UNSIGNED_INT, (void *)(GL_UNSIGNED_INT*3));*/
-	}
-	glBindTexture(GL_TEXTURE_2D, floor_texture_);
-	glm::mat4 model = glm::mat4(1.0f);
-	model = glm::translate(model, wall_positions_[2]);
-	model = glm::scale(model, glm::vec3(0.5f)); // Make it a smaller cube
-	wall_shader_->setMat4("model", model);
-	// glDrawArrays(GL_TRIANGLES, 0, 36);
+	// render two walls and the floor
+	background_shader_->use();
+	updateViewpoint(background_shader_);
+	glBindVertexArray(background_VAO_);
+
+	background_shader_->setInt("material.diffuseMap", wall_texture_ - 1);
+	background_shader_->setMat4("model", model_matrices_[0]);
+	glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, (void *)0);
+	background_shader_->setMat4("model", model_matrices_[1]);
 	glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, (void *)0);
 
+	// switch texture
+	background_shader_->setInt("material.diffuseMap", floor_texture_ - 1);
+	background_shader_->setMat4("model", model_matrices_[2]);
+	glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, (void *)0);
 }
 
 void DemoSystem::renderSpheres() {
 	sphere_shader_->use();
 	updateViewpoint(sphere_shader_);
 
-	float currentFrame1 = glfwGetTime();
-
-	float timestep = 0.1f;//0.5f
-	engine_->update(timestep);
-
+	// get updated vertices from engine
+	engine_->update(simulation_timestep_);
 	float* updated_pos = engine_->outputPos();
-
-	float currentFrame2 = glfwGetTime();
-	//printf("%.6f", currentFrame2 - currentFrame1);
-
 	uint *type = engine_->getSphereType();
-	// draw spheres
+
 	glBindVertexArray(sphere_VAO_);
-	// glDrawElements(GL_TRIANGLE_STRIP, sphereIndexCount, GL_UNSIGNED_INT, 0);
 	for (uint i = 0; i < sphere_num_; ++i) {
-		// calculate the model matrix for each object and pass it to shader before drawing
+		// calculate the model matrix for each sphere
 		glm::mat4 model = glm::mat4(1.0f);
 		uint i_x3 = i * 3;
 		model = glm::translate(model, glm::vec3(updated_pos[i_x3], updated_pos[i_x3 + 1], updated_pos[i_x3 + 2]));
-		float angle = 20.0f * i;
-		model = glm::rotate(model, glm::radians(angle), glm::vec3(1.0f, 0.3f, 0.5f));
 		sphere_shader_->setMat4("model", model);
-		sphere_shader_->setFloat("radius", PROTOTYPES[type[i]].radius);
+
+		// set shader attributes according to the sphere type (material and radius)
+		Sphere proto = PROTOTYPES[type[i]];
+		sphere_shader_->setFloat("radius", proto.radius);
+		sphere_shader_->setFloat("material.shininess", proto.shininess);
+		sphere_shader_->setVec3("material.ambient", proto.ambient);
+		sphere_shader_->setVec3("material.diffuse", proto.diffuse);
+		sphere_shader_->setVec3("material.specular", proto.specular);
+
 		glDrawElements(GL_TRIANGLE_STRIP, sphere_index_count_, GL_UNSIGNED_INT, 0);
 	}
 }
@@ -380,7 +359,8 @@ void DemoSystem::renderSpheres() {
 void DemoSystem::testPerformance(uint test_iters) {
 	LARGE_INTEGER frequency, startCount, stopCount;
 	BOOL ret;
-	//返回性能计数器每秒滴答的个数
+
+	// us level timer
 	ret = QueryPerformanceFrequency(&frequency);
 	if (ret) {
 		ret = QueryPerformanceCounter(&startCount);
@@ -450,23 +430,21 @@ void DemoSystem::processInput(GLFWwindow *window) {
 	if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
 		glfwSetWindowShouldClose(window, true);
 	if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
-		camera_->processKeyboard(FORWARD, deltaTime_);
+		camera_->processKeyboard(FORWARD, loop_duration_);
 	if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
-		camera_->processKeyboard(BACKWARD, deltaTime_);
+		camera_->processKeyboard(BACKWARD, loop_duration_);
 	if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
-		camera_->processKeyboard(LEFT, deltaTime_);
+		camera_->processKeyboard(LEFT, loop_duration_);
 	if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
-		camera_->processKeyboard(RIGHT, deltaTime_);
+		camera_->processKeyboard(RIGHT, loop_duration_);
 }
 
-// glfw: whenever the window size changed (by OS or user resize) this callback function executes
 void DemoSystem::framebufferSizeCallback(int width, int height) {
-	// make sure the viewport matches the new window dimensions; note that width and 
-	// height will be significantly larger than specified on retina displays.
+	// make sure the viewport matches the new window dimensions; 
+	// width and height will be significantly larger than specified on retina displays.
 	glViewport(0, 0, width, height);
 }
 
-// glfw: whenever the mouse moves, this callback is called
 void DemoSystem::mouseCallback(double pos_x, double pos_y) {
 	if (first_mouse_) {
 		last_mouse_x_ = pos_x;
@@ -483,7 +461,6 @@ void DemoSystem::mouseCallback(double pos_x, double pos_y) {
 	camera_->processMouseMovement(xoffset, yoffset);
 }
 
-// glfw: whenever the mouse scroll wheel scrolls, this callback is called
 void DemoSystem::scrollCallback(double xoffset, double yoffset) {
 	camera_->processMouseScroll(yoffset);
 }
