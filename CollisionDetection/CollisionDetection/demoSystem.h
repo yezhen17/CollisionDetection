@@ -12,7 +12,8 @@
 class DemoSystem
 {
 public:
-	DemoSystem(bool render_mode=true, bool use_spotlight=false, bool immersive_mode_=false);
+	DemoSystem(bool render_mode=true, bool use_spotlight=false, bool immersive_mode_=false,
+		uint frame_rate=FRAME_RATE, uint sphere_num=SPHERE_NUM);
 	~DemoSystem();
 
 	// start demo, including initialization
@@ -47,10 +48,16 @@ protected:
 	void processInput(GLFWwindow *window);
 
 	
-	void updateShader();
-	void updateSpherePosition(float delta_time);
+	void updateViewpoint(Shader *shader);
+	void renderSpheres();
+	void renderBackground();
 
-	void loadWallTexture();
+	// load the textures for the wall and floor
+	// reference https://learnopengl.com/code_viewer_gh.php?code=src/1.getting_started/4.2.textures_combined/textures_combined.cpp
+	uint loadTexture(char const * path);
+
+	// initialize shader
+	Shader *initShader(char const * vs_path, char const * fs_path, uint texture_id);
 	
 	   
 protected: // data
@@ -58,19 +65,30 @@ protected: // data
 	GLFWwindow*  window_;
 	PhysicsEngine* engine_;
 	uint sphere_num_;
-	uint sphereVAO_;
-	uint sphereVBO_;
-	uint sphereEBO_;
-	GLuint sphere_index_count_;
+	uint sphere_VAO_;
+	uint sphere_VBO_;
+	uint sphere_EBO_;
+
+	uint wall_VAO_;
+	uint wall_VBO_;
+	uint wall_EBO_;
+	uint wall_texture_;
+	uint floor_texture_;
+	uint sphere_index_count_;
 	Camera *camera_;
-	Shader *lighting_shader_;
+	Shader *sphere_shader_;
+	Shader *wall_shader_;
 	float last_mouse_x_;
 	float last_mouse_y_;
 	bool first_mouse_;
 
+	uint frame_rate_;
+	float loop_duration_;
+
 	bool use_spotlight_;
 
-	std::vector<glm::vec3> pointLightPositions;
+	std::vector<glm::vec3> pointlight_positions_;
+	std::vector<glm::vec3> wall_positions_;
 
 	// timing
 	float deltaTime_;

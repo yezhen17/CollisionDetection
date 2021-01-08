@@ -20,7 +20,7 @@
 #include <helper_functions.h>
 #include <helper_cuda.h>    // includes cuda.h and cuda_runtime_api.h
 
-unsigned int loadTexture(const char *path);
+unsigned int loadTextures(const char *path);
 
 // settings
 const unsigned int SCR_WIDTH = 800;
@@ -70,7 +70,7 @@ int main(int argc, char **argv)
 
 // utility function for loading a 2D texture from file
 // ---------------------------------------------------
-unsigned int loadTexture(char const * path)
+unsigned int loadTextures(char const * path)
 {
 	unsigned int textureID;
 	glGenTextures(1, &textureID);

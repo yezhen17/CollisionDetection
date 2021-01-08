@@ -181,6 +181,7 @@
     <None Include="particles_kernel_impl.cuh" />
     <ClInclude Include="hSimulation.h" />
     <ClInclude Include="physicsEngine.h" />
+    <ClInclude Include="shader.h" />
     <ClInclude Include="sphere.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

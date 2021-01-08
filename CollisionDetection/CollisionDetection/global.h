@@ -5,6 +5,7 @@ typedef unsigned int uint;
 
 #define GRID_SIZE       64
 #define SPHERE_NUM   1000
+#define FRAME_RATE 25
 
 #define GPU_MODE true
 
