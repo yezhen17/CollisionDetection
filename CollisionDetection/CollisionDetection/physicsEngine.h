@@ -29,7 +29,12 @@ public:
 	// simulate the collision and motion of all spheres in given amount of time (elapse) 
 	void update(float elapse);
 
+	uint *getSphereType() { return h_type_; }
+
 protected:
+	// initialize the environment
+	void initEnvironment();
+
 	// initialize the type, position and velocity of all spheres
 	void initSpheres();
 
@@ -68,39 +73,13 @@ protected:
 
 	SimulationEnv env_;
 	SimulationSphereProto protos_;
-	uint3 m_gridSize;
+	uint3 grid_size_;
 	uint3 grid_exp_;
 	uint cell_num_;
 
+	glm::vec3 origin_;
+	glm::vec3 room_size_;
 
-public:
-
-	void setEnvDrag(float x) {
-		env_.drag = x;
-	}
-	void setEnvGravity(float x) {
-		env_.gravity = make_float3(0.0f, x, 0.0f);
-	}
-
-	void setEnvStiffness(float x) {
-		env_.stiffness = x;
-	}
-
-	void setEnvDamping(float val) {
-		env_.damping = val;
-	}
-
-	void setBoundaryDamping(float val) {
-		env_.boundary_damping = val;
-	}
-
-	void setEnvFriction(float val) {
-		env_.friction = val;
-	}
-
-	uint *getSphereType() {
-		return h_type_;
-	}
 };
 
 #endif // !PHYSICSENGINE_H

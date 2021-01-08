@@ -31,6 +31,7 @@ typedef struct Sphere {
 	}
 } Sphere;
 
+// TODO
 const Sphere PROTOTYPES[7] = {
 	// ruby
 	Sphere(1.0f, 1.0f / 32.0f, 

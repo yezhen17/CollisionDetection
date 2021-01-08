@@ -54,13 +54,12 @@ extern "C" {
         checkCudaErrors(cudaDeviceSynchronize());
     }
 
-    void copyArrayToDevice(void *device, const void *host, int offset, int size) {
+    void copyHost2Device(void *device, const void *host, int offset, int size) {
         checkCudaErrors(cudaMemcpy((char *) device + offset, host, size, cudaMemcpyHostToDevice));
     }
 
-	void copyArrayFromDevice(void *host, const void *device, int size) {
+	void copyDevice2Host(void *host, const void *device, int size) {
 		checkCudaErrors(cudaMemcpy(host, device, size, cudaMemcpyDeviceToHost));
-		//cudaMemcpyFromSymbol(host, device, size);
 	}
 
     void dSetupSimulation(
@@ -79,28 +78,7 @@ extern "C" {
     // compute grid and thread block size for a given number of elements
     void computeGridSize(uint n, uint blockSize, uint &numBlocks, uint &numThreads) {
         numThreads = min(blockSize, n);
-        numBlocks = iDivUp(n, numThreads);
-    }
-
-    void dUpdateDynamics(
-		float *pos_s, 
-		float *velo_s, 
-		float *velo_delta_s, 
-		uint *types,
-		float elapse, 
-		uint sphere_num) {
-		uint numThreads, numBlocks;
-		computeGridSize(sphere_num, 256, numBlocks, numThreads);
-
-		// parallelly update the position and velocity of each sphere
-		updateDynamicsKernel <<< numBlocks, numThreads >>> (
-			(float3 *)pos_s,
-			(float3 *)velo_s,
-			(float3 *)velo_delta_s,
-			types,
-			elapse);
-
-		getLastCudaError("Kernel execution failed");
+		numBlocks = (n + numThreads - 1) / numThreads; //    iDivUp(n, numThreads);
     }
 
     void dHashifyAndSort(
@@ -172,5 +150,26 @@ extern "C" {
         // check if kernel invocation generated an error
         getLastCudaError("Kernel execution failed");
     }
+
+	void dUpdateDynamics(
+		float *pos_s,
+		float *velo_s,
+		float *velo_delta_s,
+		uint *types,
+		float elapse,
+		uint sphere_num) {
+		uint numThreads, numBlocks;
+		computeGridSize(sphere_num, 256, numBlocks, numThreads);
+
+		// parallelly update the position and velocity of each sphere
+		updateDynamicsKernel << < numBlocks, numThreads >> > (
+			(float3 *)pos_s,
+			(float3 *)velo_s,
+			(float3 *)velo_delta_s,
+			types,
+			elapse);
+
+		getLastCudaError("Kernel execution failed");
+	}
 
 }   // extern "C"

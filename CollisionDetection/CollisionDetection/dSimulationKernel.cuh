@@ -118,6 +118,7 @@ __global__ void collectCellsKernel(
 	}
 }
 
+// TODO
 // Use the DEM method adapted to various masses and restitudes
 __device__ float3 collisionAtomic(
 	float3 pos_c,
@@ -244,6 +245,8 @@ __global__ void updateDynamicsKernel(
 
 	float3 max_corner = d_env.max_corner;
 	float3 min_corner = d_env.min_corner;
+
+	// TODO
 	if (pos.x > max_corner.x - radius) {
 		pos.x = max_corner.x - radius;
 		velo.x *= d_env.boundary_damping;

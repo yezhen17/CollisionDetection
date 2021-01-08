@@ -19,8 +19,8 @@ extern "C"
 
     void threadSync();
 
-	void copyArrayFromDevice(void *host, const void *device, int size);
-    void copyArrayToDevice(void *device, const void *host, int offset, int size);
+	void copyDevice2Host(void *host, const void *device, int size);
+    void copyHost2Device(void *device, const void *host, int offset, int size);
 
     void dSetupSimulation(SimulationEnv *h_env, SimulationSphereProto *h_protos);
     void dUpdateDynamics(float *pos_s, float *velo_s, float *velo_delta_s, uint *types, float elapse, uint sphere_num);
