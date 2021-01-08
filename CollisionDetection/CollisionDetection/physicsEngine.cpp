@@ -97,7 +97,7 @@ PhysicsEngine::PhysicsEngine(uint sphere_num, uint grid_size, bool gpu_mode):
 	memset(h_cell_start_, 0, cell_num_ * sizeof(uint));
 	memset(h_cell_end_, 0, cell_num_ * sizeof(uint));
 
-	initData();
+	initRenderer();
 	hSetupSimulation(&env_, &stats_);
 
 	if (gpu_mode_)
@@ -162,7 +162,7 @@ PhysicsEngine::~PhysicsEngine()
 	
 }
 
-void PhysicsEngine::initData()
+void PhysicsEngine::initRenderer()
 {
 	float jitter = env_.max_radius*0.01f;
 	uint s = (int)ceilf(powf((float)sphere_num_, 1.0f / 3.0f));

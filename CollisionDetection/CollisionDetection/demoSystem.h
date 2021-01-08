@@ -1,3 +1,8 @@
+/*
+ * This file defines a demo system for testing the collision detection algorithm
+ * This system can both run in render mode and performance test mode
+ */
+
 #ifndef DEMOSYSTEM_H
 #define DEMOSYSTEM_H
 
@@ -7,17 +12,46 @@
 class DemoSystem
 {
 public:
-	DemoSystem();
+	DemoSystem(bool render_mode=true, bool use_spotlight=false, bool immersive_mode_=false);
 	~DemoSystem();
-	void initWindow();
+
+	// start demo, including initialization
+	void startDemo();
+
+protected:
+	// initialize necessary parameters and data for the system to work
 	void initSystem();
-	void initData();
+
+	// initialize the glfw window for rendering
+	void initWindow();
+
+	//initialize renderer and related data
+	void initRenderer();
+
+	// rendering main loop
 	void mainLoop();
-	void framebuffer_size_callback(int width, int height);
-	void mouse_callback(double xpos, double ypos);
-	void scroll_callback(double xoffset, double yoffset);
-	void processInput(GLFWwindow *window);
+
+	// test collision detection algorithm performance without rendering
 	void testPerformance(uint test_iters = 1000);
+
+	// frame buffer callback function
+	void framebuffer_size_callback(int width, int height);
+
+	// mouse click callback function
+	void mouse_callback(double xpos, double ypos);
+	
+	// mouse scroll callback function
+	void scroll_callback(double xoffset, double yoffset);
+
+	// keyboard callback function
+	void processInput(GLFWwindow *window);
+
+	
+	void updateShader();
+	void updateSpherePosition(float delta_time);
+
+	void loadWallTexture();
+	
 	   
 protected: // data
 	// camera
@@ -30,9 +64,11 @@ protected: // data
 	GLuint sphere_index_count_;
 	Camera *camera_;
 	Shader *lighting_shader_;
-	float lastX_;
-	float lastY_;
-	bool firstMouse_;
+	float last_mouse_x_;
+	float last_mouse_y_;
+	bool first_mouse_;
+
+	bool use_spotlight_;
 
 	std::vector<glm::vec3> pointLightPositions;
 
@@ -40,11 +76,8 @@ protected: // data
 	float deltaTime_;
 	float lastFrame_;
 
-private:
-	void updateShader();
-	void updateSpherePosition(float delta_time);
-
-
+	bool render_mode_;
+	bool immersive_mode_;
 };
 
 

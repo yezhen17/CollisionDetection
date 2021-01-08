@@ -11,7 +11,7 @@ class PhysicsEngine
 public:
 	PhysicsEngine(uint sphere_num= SPHERE_NUM, uint grid_size=GRID_SIZE, bool gpu_mode= GPU_MODE);
 	~PhysicsEngine();
-	void initData();
+	void initRenderer();
 	float* outputPos();
 	void update(float deltaTime);
 
