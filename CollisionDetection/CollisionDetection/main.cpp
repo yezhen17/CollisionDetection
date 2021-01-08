@@ -20,7 +20,6 @@
 #include <helper_functions.h>
 #include <helper_cuda.h>    // includes cuda.h and cuda_runtime_api.h
 
-unsigned int loadTextures(const char *path);
 
 // settings
 const unsigned int SCR_WIDTH = 800;
@@ -43,66 +42,10 @@ DemoSystem* demo_system = 0;
 
 extern "C" void cudaInit(int argc, char **argv);
 
-int main(int argc, char **argv)
-{
+int main(int argc, char **argv) {
 	cudaInit(argc, argv);
-	/*uint3 grid_size;
-	grid_size.x = grid_size.y = grid_size.z = GRID_SIZE;
-	ParticleSystem* psystem = new ParticleSystem(SPHERE_NUM, grid_size, false);
-	psystem->reset(ParticleSystem::CONFIG_GRID);
-	for (int i = 0; i < 10000; i++)
-	{
-		psystem->update(0.01f);
-	}
-*/
-	/*PhysicsEngine *psystem = new PhysicsEngine();
-	for (int i = 0; i < 10000; i++)
-	{
-		psystem->update(0.01f);
-	}*/
-
 	demo_system = new DemoSystem();
 	demo_system->startDemo();
 
 	return 0;
-}
-	
-
-// utility function for loading a 2D texture from file
-// ---------------------------------------------------
-unsigned int loadTextures(char const * path)
-{
-	unsigned int textureID;
-	glGenTextures(1, &textureID);
-
-	int width, height, nrComponents;
-	unsigned char *data = stbi_load(path, &width, &height, &nrComponents, 0);
-	if (data)
-	{
-		GLenum format;
-		if (nrComponents == 1)
-			format = GL_RED;
-		else if (nrComponents == 3)
-			format = GL_RGB;
-		else if (nrComponents == 4)
-			format = GL_RGBA;
-
-		glBindTexture(GL_TEXTURE_2D, textureID);
-		glTexImage2D(GL_TEXTURE_2D, 0, format, width, height, 0, format, GL_UNSIGNED_BYTE, data);
-		glGenerateMipmap(GL_TEXTURE_2D);
-
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-
-		stbi_image_free(data);
-	}
-	else
-	{
-		std::cout << "Texture failed to load at path: " << path << std::endl;
-		stbi_image_free(data);
-	}
-
-	return textureID;
 }

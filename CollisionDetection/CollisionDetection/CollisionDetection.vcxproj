@@ -161,9 +161,6 @@
     <ClCompile Include="physicsEngine.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <CudaCompile Include="cuda_test.cu">
-      <FileType>Document</FileType>
-    </CudaCompile>
     <CudaCompile Include="physicsEngine_cuda.cu">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">false</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">false</ExcludedFromBuild>

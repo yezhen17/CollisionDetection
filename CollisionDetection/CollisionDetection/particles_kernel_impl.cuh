@@ -18,7 +18,6 @@
 
 #include <stdio.h>
 #include <math.h>
-#include <cooperative_groups.h>
 #include "device_launch_parameters.h"
 #include "helper_math.h"
 #include "math_constants.h"
@@ -64,8 +63,7 @@ __global__ void updateDynamicsKernel(
 	float3 *velo_s, 
 	float3 *velo_delta_s, 
 	uint *types,
-	float elapse)
-{
+	float elapse) {
 	uint index = GET_INDEX;
 	if (index >= d_env.sphere_num) return;
 
@@ -85,40 +83,34 @@ __global__ void updateDynamicsKernel(
 	// set this to zero to disable collisions with cube sides
 #if 1
 
-	if (pos.x > 1.0f - radius)
-	{
+	if (pos.x > 1.0f - radius) {
 		pos.x = 1.0f - radius;
 		velo.x *= d_env.boundary_damping;
 	}
 
-	if (pos.x < -1.0f + radius)
-	{
+	if (pos.x < -1.0f + radius) {
 		pos.x = -1.0f + radius;
 		velo.x *= d_env.boundary_damping;
 	}
 
-	if (pos.y > 1.0f - radius)
-	{
+	if (pos.y > 1.0f - radius) {
 		pos.y = 1.0f - radius;
 		velo.y *= d_env.boundary_damping;
 	}
 
-	if (pos.z > 1.0f - radius)
-	{
+	if (pos.z > 1.0f - radius) {
 		pos.z = 1.0f - radius;
 		velo.z *= d_env.boundary_damping;
 	}
 
-	if (pos.z < -1.0f + radius)
-	{
+	if (pos.z < -1.0f + radius) {
 		pos.z = -1.0f + radius;
 		velo.z *= d_env.boundary_damping;
 	}
 
 #endif
 
-	if (pos.y < -1.0f + radius)
-	{
+	if (pos.y < -1.0f + radius) {
 		pos.y = -1.0f + radius;
 		velo.y *= d_env.boundary_damping;
 	}
@@ -128,8 +120,7 @@ __global__ void updateDynamicsKernel(
 }
 
 // calculate position in uniform grid
-__device__ int3 convertWorldPosToGrid(float3 world_pos)
-{
+__device__ int3 convertWorldPosToGrid(float3 world_pos) {
 	int3 grid_pos;
 	grid_pos.x = floor((world_pos.x - d_env.worldOrigin.x) / d_env.cell_size.x);
 	grid_pos.y = floor((world_pos.y - d_env.worldOrigin.y) / d_env.cell_size.y);
@@ -138,8 +129,7 @@ __device__ int3 convertWorldPosToGrid(float3 world_pos)
 }
 
 // calculate address in grid from position (clamping to edges)
-__device__ uint hashFunc(int3 grid_pos)
-{
+__device__ uint hashFunc(int3 grid_pos) {
 	grid_pos.x = grid_pos.x & (d_env.grid_size.x - 1);  // wrap grid, assumes size is power of 2
 	grid_pos.y = grid_pos.y & (d_env.grid_size.y - 1);
 	grid_pos.z = grid_pos.z & (d_env.grid_size.z - 1);
@@ -152,8 +142,7 @@ __device__ uint hashFunc(int3 grid_pos)
 __global__ void hashifyKernel(
 	uint *hashes, 
 	uint *indices_to_sort,
-	float3 *pos)
-{
+	float3 *pos) {
     uint index = GET_INDEX;
 
     if (index >= d_env.sphere_num) return;
@@ -182,23 +171,18 @@ __global__ void hashifyKernel(
 __global__ void collectCellsKernel(
 	uint   *cell_start,        // output: cell start index
 	uint   *cell_end,          // output: cell end index
-	uint   *hashes)
-{
+	uint   *hashes) {
 	uint index = GET_INDEX;
 	if (index >= d_env.sphere_num) return;
 
 	uint hash = hashes[index];
-	if (index == 0)
-	{
+	if (index == 0) {
 		cell_start[hash] = index;
-	}
-	else if (hash != hashes[index - 1])
-	{
+	} else if (hash != hashes[index - 1]) {
 		cell_start[hash] = index;
 		cell_end[hashes[index - 1]] = index;
 	}
-	if (index == d_env.sphere_num - 1)
-	{
+	if (index == d_env.sphere_num - 1) {
 		cell_end[hash] = index + 1;
 	}
 }
@@ -212,8 +196,7 @@ __device__ float3 collisionAtomic(
 	float radius_c, 
 	float radius_n,
 	float mass_c, 
-	float mass_n)
-{
+	float mass_n) {
 	float3 displacement = pos_n - pos_c;
 
 	float distance = length(displacement);
@@ -221,8 +204,7 @@ __device__ float3 collisionAtomic(
 
 	float3 force = make_float3(0.0f);
 
-	if (distance < radius_sum)
-	{
+	if (distance < radius_sum) {
 		float3 normal = displacement / distance;
 
 		// relative velocity
@@ -235,8 +217,7 @@ __device__ float3 collisionAtomic(
 
 		// stiffness force
 		float deform = radius_sum - distance;
-		if (deform > radius_c * 2)
-		{
+		if (deform > radius_c * 2) {
 			deform = radius_c * 2;
 		}
 		force = -(d_env.stiffness * deform) * normal;
@@ -260,8 +241,7 @@ __global__ void collisionKernel(
 	uint *types,
 	uint   *indices_sorted,    // input: sorted particle indices_sorted
 	uint   *cell_start,
-	uint   *cell_end)
-{
+	uint   *cell_end) {
     uint index = GET_INDEX;
     if (index >= d_env.sphere_num) return;
 
@@ -280,22 +260,19 @@ __global__ void collisionKernel(
     float3 force = make_float3(0.0f);
 
 	// need not deal with out-of-boundary neighbors because of hashing
-	for (uint i = 0; i < 27; ++i)
-	{
+	for (uint i = 0; i < 27; ++i) {
 		uint hash = hashFunc(grid_pos_c + neighboorhood_3[i]);
 
 		// get start of bucket for this cell
 		uint index_cell_start = cell_start[hash];
 
-		if (index_cell_start != 0xffffffff)          // cell is not empty
-		{
+		if (index_cell_start != 0xffffffff) {
 			// iterate over particles in this cell
 			uint index_cell_end = cell_end[hash];
-			for (uint j = index_cell_start; j < index_cell_end; ++j)
-			{
+			for (uint j = index_cell_start; j < index_cell_end; ++j) {
 				uint index_origin_n = indices_sorted[j];
-				if (index_origin_n != index_origin_c)                // check not colliding with self
-				{
+				// prevent collision with itself
+				if (index_origin_n != index_origin_c) {
 					float3 pos_n = pos_s[index_origin_n];
 					float3 vel_n = velo_s[index_origin_n];
 					uint type_n = types[index_origin_n];

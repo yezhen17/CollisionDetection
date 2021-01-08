@@ -6,8 +6,7 @@
 #include "particles_kernel.cuh"
 #include "vector_functions.h"
 
-class PhysicsEngine
-{
+class PhysicsEngine {
 public:
 	PhysicsEngine(uint sphere_num= SPHERE_NUM, uint grid_size=GRID_SIZE, bool gpu_mode= GPU_MODE);
 	~PhysicsEngine();
@@ -27,9 +26,6 @@ protected:
 	float *h_velo_;              // particle velocities
 	float *h_velo_delta_;
 
-	float *h_mass_;
-	float *h_rest_;
-	float *h_radius_;
 	float *h_color_;
 	uint *h_type_;
 
@@ -43,9 +39,6 @@ protected:
 	float *d_pos_;        // these are the CUDA deviceMem Pos
 	float *d_velo_;
 	float *d_velo_delta_;
-	float *d_mass_;
-	float *d_rest_;
-	float *d_radius_;
 	uint *d_type_;
 
 	// grid data for sorting method
@@ -65,37 +58,30 @@ protected:
 
 public:
 
-	void setEnvDrag(float x)
-	{
+	void setEnvDrag(float x) {
 		env_.drag = x;
 	}
-	void setEnvGravity(float x)
-	{
+	void setEnvGravity(float x) {
 		env_.gravity = make_float3(0.0f, x, 0.0f);
 	}
 
-	void setEnvStiffness(float x)
-	{
+	void setEnvStiffness(float x) {
 		env_.stiffness = x;
 	}
 
-	void setEnvDamping(float val)
-	{
+	void setEnvDamping(float val) {
 		env_.damping = val;
 	}
 
-	void setBoundaryDamping(float val)
-	{
+	void setBoundaryDamping(float val) {
 		env_.boundary_damping = val;
 	}
 
-	void setEnvFriction(float val)
-	{
+	void setEnvFriction(float val) {
 		env_.friction = val;
 	}
 
-	uint *getSphereType()
-	{
+	uint *getSphereType() {
 		return h_type_;
 	}
 };

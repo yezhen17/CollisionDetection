@@ -18,8 +18,7 @@ typedef unsigned int uint;
 
 
 // simulation parameters
-struct SimulationEnv
-{
+struct SimulationEnv {
 	uint3 grid_exp;
 
     float3 gravity;
@@ -41,8 +40,7 @@ struct SimulationEnv
 	float e;
 };
 
-struct SimulationSphereStats
-{
+struct SimulationSphereStats {
 	float radii[7];
 	float masses[7];
 };

@@ -3,8 +3,7 @@
 
 #include "global.h"
 
-typedef struct Sphere
-{
+typedef struct Sphere {
 	float mass;
 	float radius;
 	uint material_type;
@@ -20,14 +19,12 @@ typedef struct Sphere
 		r(r),
 		g(g),
 		b(b),
-		stiffness(stiffness)
-	{
+		stiffness(stiffness) {
 
 	}
 } Sphere;
 
-const Sphere PROTOTYPES[7] =
-{
+const Sphere PROTOTYPES[7] = {
 	Sphere(1.0f, 1.0f / 32.0f, 0, 0.0f, 0.0f, 0.0f),
 	Sphere(2.0f, 1.0f / 24.0f, 0, 0.0f, 0.0f, 0.0f),
 	Sphere(1.0f, 1.0f / 24.0f, 0, 0.0f, 0.0f, 0.0f),

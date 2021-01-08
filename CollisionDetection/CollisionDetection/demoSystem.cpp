@@ -36,14 +36,11 @@ DemoSystem::~DemoSystem() {
 
 void DemoSystem::startDemo() {
 	initSystem();
-	if (render_mode_)
-	{
+	if (render_mode_) {
 		initWindow();
 		initRenderer();
 		mainLoop();
-	}
-	else
-	{
+	} else {
 		testPerformance();
 	}
 }
@@ -85,13 +82,13 @@ void DemoSystem::initWindow() {
 	// reference: https://stackoverflow.com/questions/7676971/pointing-to-a-function-that-is-a-class-member-glfw-setkeycallback
 	glfwSetWindowUserPointer(window_, this);
 	auto framebuffer_size_callback_func = [](GLFWwindow* window, int width, int height) {
-		static_cast<DemoSystem*>(glfwGetWindowUserPointer(window))->framebuffer_size_callback(width, height);
+		static_cast<DemoSystem*>(glfwGetWindowUserPointer(window))->framebufferSizeCallback(width, height);
 	};
 	auto mouse_callback_func = [](GLFWwindow* window, double xpos, double ypos) {
-		static_cast<DemoSystem*>(glfwGetWindowUserPointer(window))->mouse_callback(xpos, ypos);
+		static_cast<DemoSystem*>(glfwGetWindowUserPointer(window))->mouseCallback(xpos, ypos);
 	};
 	auto scroll_callback_func = [](GLFWwindow* window, double xoffset, double yoffset) {
-		static_cast<DemoSystem*>(glfwGetWindowUserPointer(window))->scroll_callback(xoffset, yoffset);
+		static_cast<DemoSystem*>(glfwGetWindowUserPointer(window))->scrollCallback(xoffset, yoffset);
 	};
 
 	glfwSetFramebufferSizeCallback(window_, framebuffer_size_callback_func);
@@ -139,8 +136,7 @@ void DemoSystem::initRenderer() {
 				indices.push_back(y * (X_SEGMENTS + 1) + x);
 				indices.push_back((y + 1) * (X_SEGMENTS + 1) + x);
 			}
-		}
-		else {
+		} else {
 			for (int x = X_SEGMENTS; x >= 0; --x) {
 				indices.push_back((y + 1) * (X_SEGMENTS + 1) + x);
 				indices.push_back(y * (X_SEGMENTS + 1) + x);
@@ -327,8 +323,7 @@ void DemoSystem::renderBackground() {
 	updateViewpoint(wall_shader_);
 	glBindVertexArray(wall_VAO_);
 	
-	for (unsigned int i = 0; i < 2; i++)
-	{
+	for (unsigned int i = 0; i < 2; i++) {
 		glm::mat4 model = glm::mat4(1.0f);
 		model = glm::translate(model, wall_positions_[i]);
 		model = glm::scale(model, glm::vec3(0.5f)); // Make it a smaller cube
@@ -369,8 +364,7 @@ void DemoSystem::renderSpheres() {
 	// draw spheres
 	glBindVertexArray(sphere_VAO_);
 	// glDrawElements(GL_TRIANGLE_STRIP, sphereIndexCount, GL_UNSIGNED_INT, 0);
-	for (uint i = 0; i < sphere_num_; ++i)
-	{
+	for (uint i = 0; i < sphere_num_; ++i) {
 		// calculate the model matrix for each object and pass it to shader before drawing
 		glm::mat4 model = glm::mat4(1.0f);
 		uint i_x3 = i * 3;
@@ -383,8 +377,7 @@ void DemoSystem::renderSpheres() {
 	}
 }
 
-void DemoSystem::testPerformance(uint test_iters)
-{
+void DemoSystem::testPerformance(uint test_iters) {
 	LARGE_INTEGER frequency, startCount, stopCount;
 	BOOL ret;
 	//返回性能计数器每秒滴答的个数
@@ -392,18 +385,14 @@ void DemoSystem::testPerformance(uint test_iters)
 	if (ret) {
 		ret = QueryPerformanceCounter(&startCount);
 	}
-	for (uint i = 0; i < test_iters; ++i)
-	{
+	for (uint i = 0; i < test_iters; ++i) {
 		engine_->update(0.1f);
 	}
 	if (ret) {
 		QueryPerformanceCounter(&stopCount);
-	}
-	if (ret) {
 		LONGLONG elapsed = (stopCount.QuadPart - startCount.QuadPart) * 1000000 / frequency.QuadPart;
 		printf("QueryPerformanceFrequency & QueryPerformanceCounter = %ld us", elapsed);
 	}
-
 }
 
 void DemoSystem::updateViewpoint(Shader *shader) {
@@ -418,7 +407,7 @@ void DemoSystem::updateViewpoint(Shader *shader) {
 
 	// view/projection transformations
 	glm::mat4 projection = glm::perspective(glm::radians(camera_->getZoom()), (float)WINDOW_WIDTH / (float)WINDOW_HEIGHT, 0.1f, 100.0f);
-	glm::mat4 view = camera_->GetViewMatrix();
+	glm::mat4 view = camera_->getViewMatrix();
 	shader->setMat4("projection", projection);
 	shader->setMat4("view", view);
 }
@@ -429,8 +418,7 @@ uint DemoSystem::loadTexture(char const * path) {
 
 	int width, height, nrComponents;
 	unsigned char *data = stbi_load(path, &width, &height, &nrComponents, 0);
-	if (data)
-	{
+	if (data) {
 		GLenum format;
 		if (nrComponents == 1)
 			format = GL_RED;
@@ -449,9 +437,7 @@ uint DemoSystem::loadTexture(char const * path) {
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
 		stbi_image_free(data);
-	}
-	else
-	{
+	} else {
 		std::cout << "Texture failed to load at path: " << path << std::endl;
 		stbi_image_free(data);
 	}
@@ -464,24 +450,24 @@ void DemoSystem::processInput(GLFWwindow *window) {
 	if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
 		glfwSetWindowShouldClose(window, true);
 	if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
-		camera_->ProcessKeyboard(FORWARD, deltaTime_);
+		camera_->processKeyboard(FORWARD, deltaTime_);
 	if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
-		camera_->ProcessKeyboard(BACKWARD, deltaTime_);
+		camera_->processKeyboard(BACKWARD, deltaTime_);
 	if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
-		camera_->ProcessKeyboard(LEFT, deltaTime_);
+		camera_->processKeyboard(LEFT, deltaTime_);
 	if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
-		camera_->ProcessKeyboard(RIGHT, deltaTime_);
+		camera_->processKeyboard(RIGHT, deltaTime_);
 }
 
 // glfw: whenever the window size changed (by OS or user resize) this callback function executes
-void DemoSystem::framebuffer_size_callback(int width, int height) {
+void DemoSystem::framebufferSizeCallback(int width, int height) {
 	// make sure the viewport matches the new window dimensions; note that width and 
 	// height will be significantly larger than specified on retina displays.
 	glViewport(0, 0, width, height);
 }
 
 // glfw: whenever the mouse moves, this callback is called
-void DemoSystem::mouse_callback(double pos_x, double pos_y) {
+void DemoSystem::mouseCallback(double pos_x, double pos_y) {
 	if (first_mouse_) {
 		last_mouse_x_ = pos_x;
 		last_mouse_y_ = pos_y;
@@ -494,10 +480,10 @@ void DemoSystem::mouse_callback(double pos_x, double pos_y) {
 	last_mouse_x_ = pos_x;
 	last_mouse_y_ = pos_y;
 
-	camera_->ProcessMouseMovement(xoffset, yoffset);
+	camera_->processMouseMovement(xoffset, yoffset);
 }
 
 // glfw: whenever the mouse scroll wheel scrolls, this callback is called
-void DemoSystem::scroll_callback(double xoffset, double yoffset) {
-	camera_->ProcessMouseScroll(yoffset);
+void DemoSystem::scrollCallback(double xoffset, double yoffset) {
+	camera_->processMouseScroll(yoffset);
 }

@@ -6,7 +6,6 @@
  * this software. Any use, reproduction, disclosure, or distribution of
  * this software and related documentation outside the terms of the EULA
  * is strictly prohibited.
- *
  */
 
 // This file contains C wrappers around the some of the CUDA API and the
@@ -24,71 +23,59 @@
 
 #include "particles_kernel_impl.cuh"
 
-extern "C"
-{
-    void cudaInit(int argc, char **argv)
-    {
+extern "C" {
+    void cudaInit(int argc, char **argv) {
         int devID;
 
         // use command-line specified CUDA device, otherwise use device with highest Gflops/s
         devID = findCudaDevice(argc, (const char **)argv);
 
-        if (devID < 0)
-        {
+        if (devID < 0) {
             printf("No CUDA Capable devices found, exiting...\n");
             exit(EXIT_SUCCESS);
         }
     }
 
-    void allocateArray(void **devPtr, uint size)
-    {
+    void allocateArray(void **devPtr, uint size) {
         checkCudaErrors(cudaMalloc(devPtr, size));
     }
 
-	void zeroizeArray(void *devPtr, uint size)
-	{
+	void zeroizeArray(void *devPtr, uint size) {
 		checkCudaErrors(cudaMemset(devPtr, 0x0, size));
 	}
 
-    void freeArray(void *devPtr)
-    {
+    void freeArray(void *devPtr) {
         checkCudaErrors(cudaFree(devPtr));
     }
 
-    void threadSync()
-    {
+    void threadSync() {
         checkCudaErrors(cudaDeviceSynchronize());
     }
 
-    void copyArrayToDevice(void *device, const void *host, int offset, int size)
-    {
+    void copyArrayToDevice(void *device, const void *host, int offset, int size) {
         checkCudaErrors(cudaMemcpy((char *) device + offset, host, size, cudaMemcpyHostToDevice));
     }
 
-	void copyArrayFromDevice(void *host, const void *device, int size)
-	{
+	void copyArrayFromDevice(void *host, const void *device, int size) {
 		checkCudaErrors(cudaMemcpy(host, device, size, cudaMemcpyDeviceToHost));
 		//cudaMemcpyFromSymbol(host, device, size);
 	}
 
     void dSetupSimulation(
 		SimulationEnv *h_env, 
-		SimulationSphereStats *h_stats)
-    {
+		SimulationSphereStats *h_stats) {
         // copy parameters to constant memory
         checkCudaErrors(cudaMemcpyToSymbol(d_env, h_env, sizeof(SimulationEnv)));
 		checkCudaErrors(cudaMemcpyToSymbol(d_stats, h_stats, sizeof(SimulationSphereStats)));
     }
 
     //Round a / b to nearest higher integer value
-    uint iDivUp(uint a, uint b)
-    {
+    uint iDivUp(uint a, uint b) {
         return (a % b != 0) ? (a / b + 1) : (a / b);
     }
 
     // compute grid and thread block size for a given number of elements
-    void computeGridSize(uint n, uint blockSize, uint &numBlocks, uint &numThreads)
-    {
+    void computeGridSize(uint n, uint blockSize, uint &numBlocks, uint &numThreads) {
         numThreads = min(blockSize, n);
         numBlocks = iDivUp(n, numThreads);
     }
@@ -99,8 +86,7 @@ extern "C"
 		float *velo_delta_s, 
 		uint *types,
 		float elapse, 
-		uint sphere_num)
-    {
+		uint sphere_num) {
 		uint numThreads, numBlocks;
 		computeGridSize(sphere_num, 256, numBlocks, numThreads);
 
@@ -119,8 +105,7 @@ extern "C"
 		uint  *hashes, 
 		uint  *indices, 
 		float *pos, 
-		uint sphere_num)
-    {
+		uint sphere_num) {
         uint numThreads, numBlocks;
         computeGridSize(sphere_num, 256, numBlocks, numThreads);
 		
@@ -144,8 +129,7 @@ extern "C"
 		uint *cell_end,
 		uint *hash,
 		uint sphere_num,
-		uint cell_num)
-    {
+		uint cell_num) {
         uint numThreads, numBlocks;
         computeGridSize(sphere_num, 256, numBlocks, numThreads);
 
@@ -169,8 +153,7 @@ extern "C"
 		uint  *indices_sorted,
 		uint  *cell_start,
 		uint  *cell_end,
-		uint   sphere_num)
-    {
+		uint   sphere_num) {
         uint numThreads, numBlocks;
         computeGridSize(sphere_num, 64, numBlocks, numThreads);
 

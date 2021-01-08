@@ -36,13 +36,13 @@ protected:
 	void testPerformance(uint test_iters = 1000);
 
 	// frame buffer callback function
-	void framebuffer_size_callback(int width, int height);
+	void framebufferSizeCallback(int width, int height);
 
 	// mouse click callback function
-	void mouse_callback(double xpos, double ypos);
+	void mouseCallback(double xpos, double ypos);
 	
 	// mouse scroll callback function
-	void scroll_callback(double xoffset, double yoffset);
+	void scrollCallback(double xoffset, double yoffset);
 
 	// keyboard callback function
 	void processInput(GLFWwindow *window);

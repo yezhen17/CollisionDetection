@@ -40,8 +40,7 @@ int3 h_neighboorhood_3[27] = {
 	 1,  1,  1,
 };
 
-void hSetupSimulation(SimulationEnv *env, SimulationSphereStats *stats)
-{
+void hSetupSimulation(SimulationEnv *env, SimulationSphereStats *stats) {
 	h_env = env;
 	h_stats = stats;
 }
@@ -52,8 +51,7 @@ void hUpdateDynamics(
 	float3 *velo_delta_s,
 	uint *types,
 	float elapse,
-	uint sphere_num)
-{
+	uint sphere_num) {
 	for (uint i = 0; i < sphere_num; ++i)
 	{
 		float3 pos = pos_s[i];
@@ -115,8 +113,7 @@ void hUpdateDynamics(
 }
 
 // calculate position in uniform grid
-int3 hConvertWorldPosToGrid(float3 world_pos)
-{
+int3 hConvertWorldPosToGrid(float3 world_pos) {
 	int3 grid_pos;
 	grid_pos.x = floor((world_pos.x - h_env->worldOrigin.x) / h_env->cell_size.x);
 	grid_pos.y = floor((world_pos.y - h_env->worldOrigin.y) / h_env->cell_size.y);
@@ -125,8 +122,7 @@ int3 hConvertWorldPosToGrid(float3 world_pos)
 }
 
 // calculate address in grid from position (clamping to edges)
-uint hHashFunc(int3 grid_pos)
-{
+uint hHashFunc(int3 grid_pos) {
 	grid_pos.x = grid_pos.x & (h_env->grid_size.x - 1);  // wrap grid, assumes size is power of 2
 	grid_pos.y = grid_pos.y & (h_env->grid_size.y - 1);
 	grid_pos.z = grid_pos.z & (h_env->grid_size.z - 1);
@@ -139,11 +135,9 @@ uint hHashFunc(int3 grid_pos)
 	uint *hashes,
 	uint *indices_to_sort,
 	float3 *pos,
-	uint sphere_num)
-{
+	uint sphere_num) {
 	 std::vector<std::pair<uint, uint>> hashes_and_indices;
-	 for (uint i = 0; i < sphere_num; ++i)
-	 {
+	 for (uint i = 0; i < sphere_num; ++i) {
 		 float3 world_pos = pos[i];
 		 int3 grid_pos = hConvertWorldPosToGrid(world_pos);
 
@@ -158,8 +152,7 @@ uint hHashFunc(int3 grid_pos)
 		 return a.first < b.first;
 	 });
 	 int i = 0;
-	 for (auto &it: hashes_and_indices)
-	 {
+	 for (auto &it: hashes_and_indices) {
 		 hashes[i] = it.first;
 		 indices_to_sort[i] = it.second;
 		 ++i;
@@ -171,8 +164,7 @@ uint hHashFunc(int3 grid_pos)
 	 uint   *cell_end,          // output: cell end index
 	 uint   *hashes,
 	 uint sphere_num,
-	 uint cell_num)
- {
+	 uint cell_num) {
 	 memset(cell_start, (unsigned char) 0xff, cell_num * sizeof(uint));
 	 for (uint i = 0; i < sphere_num; ++i)
 	 {
@@ -202,8 +194,7 @@ uint hHashFunc(int3 grid_pos)
 	 float radius_c,
 	 float radius_n,
 	 float mass_c,
-	 float mass_n)
- {
+	 float mass_n) {
 	 float3 displacement = pos_n - pos_c;
 
 	 float distance = length(displacement);
@@ -211,8 +202,7 @@ uint hHashFunc(int3 grid_pos)
 
 	 float3 force = make_float3(0.0f);
 
-	 if (distance < radius_sum)
-	 {
+	 if (distance < radius_sum) {
 		 float3 normal = displacement / distance;
 
 		 // relative velocity
@@ -225,8 +215,7 @@ uint hHashFunc(int3 grid_pos)
 
 		 // stiffness force
 		 float deform = radius_sum - distance;
-		 if (deform > radius_c * 2)
-		 {
+		 if (deform > radius_c * 2) {
 			 deform = radius_c * 2;
 		 }
 		 force = -(h_env->stiffness * deform) * normal;
@@ -251,10 +240,8 @@ uint hHashFunc(int3 grid_pos)
 	 uint   *indices_sorted,    // input: sorted particle indices_sorted
 	 uint   *cell_start,
 	 uint   *cell_end,
-	 uint sphere_num)
- {
-	 for (uint i = 0; i < sphere_num; ++i)
-	 {
+	 uint sphere_num) {
+	 for (uint i = 0; i < sphere_num; ++i) {
 		 // Now use the sorted index to reorder the pos and vel data
 		 uint index_origin_c = indices_sorted[i];
 		 float3 pos_c = pos_s[index_origin_c];
@@ -269,28 +256,25 @@ uint hHashFunc(int3 grid_pos)
 		 float3 force = make_float3(0.0f);
 
 		 // need not deal with out-of-boundary neighbors because of hashing
-		 for (uint i = 0; i < 27; ++i)
-		 {
+		 for (uint i = 0; i < 27; ++i) {
 			 uint hash = hHashFunc(grid_pos_c + h_neighboorhood_3[i]);
 
 			 // get start of bucket for this cell
 			 uint index_cell_start = cell_start[hash];
 
-			 if (index_cell_start != 0xffffffff)          // cell is not empty
-			 {
+			 if (index_cell_start != 0xffffffff) {
 				 // iterate over particles in this cell
 				 uint index_cell_end = cell_end[hash];
-				 for (uint j = index_cell_start; j < index_cell_end; ++j)
-				 {
+				 for (uint j = index_cell_start; j < index_cell_end; ++j) {
 					 uint index_origin_n = indices_sorted[j];
-					 if (index_origin_n != index_origin_c)                // check not colliding with self
-					 {
+
+					 // prevent colliding with itself
+					 if (index_origin_n != index_origin_c) {
 						 float3 pos_n = pos_s[index_origin_n];
 						 float3 vel_n = velo_s[index_origin_n];
 						 uint type_n = types[index_origin_n];
 						 float radius_n = h_stats->radii[type_n];
 						 float mass_n = h_stats->masses[type_n];
-						 // collide two spheres
 						 force += hCollisionAtomic(pos_c, pos_n, velo_c, vel_n, radius_c, radius_n, mass_c, mass_n);
 					 }
 				 }

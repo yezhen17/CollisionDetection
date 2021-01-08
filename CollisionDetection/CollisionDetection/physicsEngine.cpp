@@ -23,8 +23,7 @@ PhysicsEngine::PhysicsEngine(uint sphere_num, uint grid_size, bool gpu_mode):
 	h_pos_(0),
 	h_velo_(0),
 	d_pos_(0),
-	d_velo_(0)
-{
+	d_velo_(0) {
 	grid_exp_.x = grid_exp_.y = grid_exp_.z = ceil(log2(grid_size));
 	printf("%d", grid_exp_.x);
 	env_.grid_exp = grid_exp_;
@@ -59,8 +58,7 @@ PhysicsEngine::PhysicsEngine(uint sphere_num, uint grid_size, bool gpu_mode):
 	setEnvDamping(damping);
 	setEnvFriction(friction);
 
-	for (uint i = 0; i < PROTOTYPE_NUM; ++i)
-	{
+	for (uint i = 0; i < PROTOTYPE_NUM; ++i) {
 		Sphere prototype = PROTOTYPES[i];
 		stats_.masses[i] = prototype.mass;
 		stats_.radii[i] = prototype.radius;
@@ -100,8 +98,7 @@ PhysicsEngine::PhysicsEngine(uint sphere_num, uint grid_size, bool gpu_mode):
 	initRenderer();
 	hSetupSimulation(&env_, &stats_);
 
-	if (gpu_mode_)
-	{
+	if (gpu_mode_) {
 		// allocate GPU data
 		allocateArray((void **)&d_pos_, space_3xf);
 		allocateArray((void **)&d_velo_, space_3xf);
@@ -127,14 +124,10 @@ PhysicsEngine::PhysicsEngine(uint sphere_num, uint grid_size, bool gpu_mode):
 
 		dSetupSimulation(&env_, &stats_);
 	}
-	
-
-	
 }
 
 
-PhysicsEngine::~PhysicsEngine()
-{
+PhysicsEngine::~PhysicsEngine() {
 	delete[] h_pos_;
 	delete[] h_velo_; 
 	delete[] h_velo_delta_;
@@ -147,8 +140,7 @@ PhysicsEngine::~PhysicsEngine()
 	delete[] h_cell_start_;
 	delete[] h_cell_end_;
 
-	if (gpu_mode_)
-	{
+	if (gpu_mode_) {
 		freeArray(d_velo_);
 		freeArray(d_velo_delta_);
 		freeArray(d_pos_);
@@ -159,27 +151,21 @@ PhysicsEngine::~PhysicsEngine()
 		freeArray(d_cell_start_);
 		freeArray(d_cell_end_);
 	}
-	
 }
 
-void PhysicsEngine::initRenderer()
-{
+void PhysicsEngine::initRenderer() {
 	float jitter = env_.max_radius*0.01f;
 	uint s = (int)ceilf(powf((float)sphere_num_, 1.0f / 3.0f));
 	uint grid_size[3];
 	grid_size[0] = grid_size[1] = grid_size[2] = s;
 	srand(1973);
 
-	for (uint z = 0; z < grid_size[2]; z++)
-	{
-		for (uint y = 0; y < grid_size[1]; y++)
-		{
-			for (uint x = 0; x < grid_size[0]; x++)
-			{
+	for (uint z = 0; z < grid_size[2]; z++) {
+		for (uint y = 0; y < grid_size[1]; y++) {
+			for (uint x = 0; x < grid_size[0]; x++) {
 				uint i = (z*grid_size[1] * grid_size[0]) + (y*grid_size[0]) + x;
 
-				if (i < sphere_num_)
-				{
+				if (i < sphere_num_) {
 					h_pos_[i * 3] = (env_.max_radius*2.0f * (x)) + env_.max_radius - 1.0f + (rand() / (float)RAND_MAX*2.0f - 1.0f)*jitter;
 					h_pos_[i * 3 + 1] = (env_.max_radius*2.0f * (y )) + env_.max_radius - 1.0f + (rand() / (float)RAND_MAX*2.0f - 1.0f)*jitter;
 					h_pos_[i * 3 + 2] = (env_.max_radius*2.0f * (z)) + env_.max_radius - 1.0f + (rand() / (float)RAND_MAX*2.0f - 1.0f)*jitter;
@@ -201,19 +187,15 @@ void PhysicsEngine::initRenderer()
 }
 	
 
-float * PhysicsEngine::outputPos()
-{
-	if (gpu_mode_)
-	{
+float * PhysicsEngine::outputPos() {
+	if (gpu_mode_) {
 		copyArrayFromDevice(h_pos_, d_pos_, sizeof(float) * 3 * sphere_num_);
 	}
 	return h_pos_;
 }
 
-void PhysicsEngine::update(float elapse)
-{
-	if (gpu_mode_)
-	{
+void PhysicsEngine::update(float elapse) {
+	if (gpu_mode_) {
 		// dSetupSimulation(&env_);
 
 		dUpdateDynamics(
@@ -246,9 +228,7 @@ void PhysicsEngine::update(float elapse)
 			d_cell_start_,
 			d_cell_end_,
 			sphere_num_);
-	}
-	else
-	{
+	} else {
 		hUpdateDynamics(
 			(float3 *)h_pos_,
 			(float3 *)h_velo_,

@@ -35,9 +35,6 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <CudaCompile Include="cuda_test.cu">
-      <Filter>源文件</Filter>
-    </CudaCompile>
     <CudaCompile Include="physicsEngine_cuda.cu" />
   </ItemGroup>
   <ItemGroup>
