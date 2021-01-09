@@ -2,8 +2,8 @@
  * This file provides the kernel code for the collision detection algorithm based on spatial subdivision
  */
 
-#ifndef _PARTICLES_KERNEL_H_
-#define _PARTICLES_KERNEL_H_
+#ifndef DSIMULATIONKERNEL_CUH
+#define DSIMULATIONKERNEL_CUH
 
 #include <stdio.h>
 #include <math.h>
@@ -13,6 +13,7 @@
 
 #include "environment.h"
 #include "sphere.h"
+#include "mortonEncode.cuh"
 
 #define GET_INDEX __mul24(blockIdx.x,blockDim.x) + threadIdx.x
 
@@ -60,10 +61,13 @@ __device__ int3 convertWorldPosToGrid(float3 world_pos) {
 
 // calculate address in grid from position (clamping to edges)
 __device__ uint hashFunc(int3 grid_pos) {
-	grid_pos.x = grid_pos.x & (d_env.grid_size.x - 1);  // wrap grid, assumes size is power of 2
-	grid_pos.y = grid_pos.y & (d_env.grid_size.y - 1);
-	grid_pos.z = grid_pos.z & (d_env.grid_size.z - 1);
-	return grid_pos.x + (grid_pos.y << d_env.grid_exp.x) + (grid_pos.z << (d_env.grid_exp.x + d_env.grid_exp.y));
+	//grid_pos.x = grid_pos.x & (d_env.grid_size.x - 1);  // wrap grid, assumes size is power of 2
+	//grid_pos.y = grid_pos.y & (d_env.grid_size.y - 1);
+	//grid_pos.z = grid_pos.z & (d_env.grid_size.z - 1);
+	//return grid_pos.x + (grid_pos.y << d_env.grid_exp.x) + (grid_pos.z << (d_env.grid_exp.x + d_env.grid_exp.y));
+
+	// use morton encoding for more coherent memory access
+	return dMortonEncode3D(grid_pos);
 
 	// return __umul24(__umul24(gridPos.z, d_env.grid_size.y), d_env.grid_size.x) + __umul24(gridPos.y, d_env.grid_size.x) + gridPos.x;
 }

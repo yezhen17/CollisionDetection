@@ -8,10 +8,21 @@
 typedef unsigned int uint;
 typedef unsigned char uchar;
 
+// fixed
+// ---------------------------------------------------------------------------------------
+
+const uint HASH_BLOCK = 64; // fix this since 64 is suitable for this task
+const float PI = 3.14159265359f;
+const uint PROTOTYPE_NUM = 7;  // maximum 7 prototypes
+
+// ---------------------------------------------------------------------------------------
+
+// can be modified
+// ---------------------------------------------------------------------------------------
+
 const float MOUSE_SPEED = 2.5f;
 const float ZOOM_DEFAULT = 20.0f;
 
-const uint GRID_SIZE = 64;
 const uint SPHERE_NUM = 1000;
 const uint FRAME_RATE = 25;
 
@@ -23,9 +34,7 @@ const uint WINDOW_HEIGHT = 900;
 const uint HORIZONTAL_FRAGMENT_NUM = 16;
 const uint VERTICAL_FRAGMENT_NUM = 16;
 
-const uint PROTOTYPE_NUM = 7;
-
-const float PI = 3.14159265359f;
+// ---------------------------------------------------------------------------------------
 
 #endif
 

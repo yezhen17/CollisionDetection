@@ -62,6 +62,9 @@
     <ClInclude Include="dSimulationKernel.cuh">
       <Filter>头文件</Filter>
     </ClInclude>
+    <ClInclude Include="mortonEncode.cuh">
+      <Filter>头文件</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <CudaCompile Include="dSimulation.cu">

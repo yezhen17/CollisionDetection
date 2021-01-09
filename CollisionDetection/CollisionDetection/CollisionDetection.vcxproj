@@ -170,12 +170,13 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="camera.h" />
-    <ClInclude Include="dSimulationKernel.cuh" />
+    <None Include="dSimulationKernel.cuh" />
     <ClInclude Include="demoSystem.h" />
     <ClInclude Include="global.h" />
     <None Include="dSimulation.cuh" />
     <None Include="environment.h" />
     <ClInclude Include="hSimulation.h" />
+    <None Include="mortonEncode.cuh" />
     <ClInclude Include="physicsEngine.h" />
     <ClInclude Include="shader.h" />
     <ClInclude Include="sphere.h" />

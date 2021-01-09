@@ -21,10 +21,10 @@ PhysicsEngine::PhysicsEngine(uint sphere_num, glm::vec3 origin, glm::vec3 room_s
 	gpu_mode_(gpu_mode),
 	origin_(origin),
 	room_size_(room_size) {
-	grid_size_.x = grid_size_.y = grid_size_.z = grid_size;
-	grid_exp_.x = grid_exp_.y = grid_exp_.z = (int) ceil(log2(grid_size));
-	cell_num_ = grid_size_.x * grid_size_.y * grid_size_.z;
-	printf("%d", grid_exp_.x);
+	// grid_size_.x = grid_size_.y = grid_size_.z = grid_size;
+	// grid_exp_.x = grid_exp_.y = grid_exp_.z = (int) ceil(log2(grid_size));
+	cell_num_ = grid_size * grid_size * grid_size; //grid_size_.x * grid_size_.y * grid_size_.z;
+	// printf("%d", grid_exp_.x);
 
 	// allocate CPU memory
 	uint space_1xf = sizeof(float) * sphere_num;
@@ -102,8 +102,8 @@ PhysicsEngine::~PhysicsEngine() {
 }
 
 void PhysicsEngine::initEnvironment() {
-	env_.grid_exp = grid_exp_;
-	env_.grid_size = grid_size_;
+	// env_.grid_exp = grid_exp_;
+	// env_.grid_size = grid_size_;
 	env_.cell_num = cell_num_;
 	env_.sphere_num = sphere_num_;
 

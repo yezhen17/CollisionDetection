@@ -12,6 +12,7 @@
 #include "global.h"
 #include "environment.h"
 #include "sphere.h"
+#include "mortonEncode.cuh"
 
 SimulationEnv *h_env; // Environment parameters
 SimulationSphereProto *h_protos; // Sphere parameters (fixed throughout simulation)
@@ -62,10 +63,11 @@ int3 hConvertWorldPosToGrid(float3 world_pos) {
 
 // calculate address in grid from position (clamping to edges)
 uint hHashFunc(int3 grid_pos) {
-	grid_pos.x = grid_pos.x & (h_env->grid_size.x - 1);  // wrap grid, assumes size is power of 2
-	grid_pos.y = grid_pos.y & (h_env->grid_size.y - 1);
-	grid_pos.z = grid_pos.z & (h_env->grid_size.z - 1);
-	return grid_pos.x + (grid_pos.y << h_env->grid_exp.x) + (grid_pos.z << (h_env->grid_exp.x + h_env->grid_exp.y));
+	return hMortonEncode3D(grid_pos);
+	//grid_pos.x = grid_pos.x & (h_env->grid_size.x - 1);  // wrap grid, assumes size is power of 2
+	//grid_pos.y = grid_pos.y & (h_env->grid_size.y - 1);
+	//grid_pos.z = grid_pos.z & (h_env->grid_size.z - 1);
+	//return grid_pos.x + (grid_pos.y << h_env->grid_exp.x) + (grid_pos.z << (h_env->grid_exp.x + h_env->grid_exp.y));
 }
 
  void hHashifyAndSort(

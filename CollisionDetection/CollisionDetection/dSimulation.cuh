@@ -9,6 +9,9 @@
  *
  */
 
+#ifndef DSIMULATION_CUH
+#define DSIMULATION_CUH
+
 extern "C"
 {
     void cudaInit(int argc, char **argv);
@@ -28,3 +31,5 @@ extern "C"
     void dCollectCells(uint *cell_start, uint *cell_end, uint *hashes, uint sphere_num, uint cell_num);
 	void dNarrowPhaseCollisionDetection(float *velo_delta_s, float *pos_s, float *velo_s, uint *types, uint *indices_sorted, uint *cell_start, uint *cell_end, uint sphere_num);
 }
+
+#endif

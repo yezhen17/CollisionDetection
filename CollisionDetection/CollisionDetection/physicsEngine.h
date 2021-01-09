@@ -18,7 +18,7 @@ public:
 	PhysicsEngine(uint sphere_num, 
 		glm::vec3 origin, 
 		glm::vec3 room_size, 
-		uint grid_size=GRID_SIZE, 
+		uint grid_size=HASH_BLOCK, 
 		bool gpu_mode= GPU_MODE);
 
 	~PhysicsEngine();
