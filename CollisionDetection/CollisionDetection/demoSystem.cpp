@@ -11,8 +11,8 @@
 
 #include "demoSystem.h"
 
-DemoSystem::DemoSystem(bool render_mode, bool use_spotlight, bool immersive_mode, float simulation_timestep,
-	uint frame_rate, uint sphere_num, glm::vec3 origin, glm::vec3 room_size):
+DemoSystem::DemoSystem(uint sphere_num, bool render_mode, bool gpu_mode, bool use_spotlight, bool immersive_mode, float simulation_timestep,
+	uint frame_rate, glm::vec3 origin, glm::vec3 room_size):
 	render_mode_(render_mode),
 	use_spotlight_(use_spotlight),
 	immersive_mode_(immersive_mode),
@@ -22,7 +22,7 @@ DemoSystem::DemoSystem(bool render_mode, bool use_spotlight, bool immersive_mode
 	sphere_num_(sphere_num),
 	origin_(origin),
 	room_size_(room_size) {
-	engine_ = new PhysicsEngine(sphere_num, origin, room_size);
+	engine_ = new PhysicsEngine(sphere_num, gpu_mode, origin, room_size);
 }
 
 DemoSystem::~DemoSystem() {
@@ -34,7 +34,8 @@ void DemoSystem::startDemo() {
 		initWindow();
 		initSpheres();
 		mainLoop();
-	} else {
+	} 
+	else {
 		testPerformance();
 	}
 }
@@ -125,7 +126,8 @@ void DemoSystem::initSpheres() {
 				vertex_indices.push_back(y * (HORIZONTAL_FRAGMENT_NUM + 1) + x);
 				vertex_indices.push_back((y + 1) * (HORIZONTAL_FRAGMENT_NUM + 1) + x);
 			}
-		} else {
+		} 
+		else {
 			for (int x = HORIZONTAL_FRAGMENT_NUM; x >= 0; --x) {
 				vertex_indices.push_back((y + 1) * (HORIZONTAL_FRAGMENT_NUM + 1) + x);
 				vertex_indices.push_back(y * (HORIZONTAL_FRAGMENT_NUM + 1) + x);
@@ -253,7 +255,6 @@ Shader *DemoSystem::initShader(char const * vs_path, char const * fs_path, uint 
 	shader->setVec3("dirLight.specular", 0.5f, 0.5f, 0.5f);
 
 	bool has_texture = texture_id != 0;
-	std::cout << std::endl << has_texture;
 	shader->setBool("HasTexture", has_texture);
 	shader->setBool("HasSpecularMap", has_specular_map);
 	shader->setBool("HasSpotLight", use_spotlight_);
@@ -278,6 +279,8 @@ Shader *DemoSystem::initShader(char const * vs_path, char const * fs_path, uint 
 }
 
 void DemoSystem::mainLoop() {
+	bool last_frame_slow = false;
+	bool second_last_frame_slow = false;
 	while (!glfwWindowShouldClose(window_)) {
 		float time_start = glfwGetTime();
 
@@ -296,7 +299,17 @@ void DemoSystem::mainLoop() {
 
 		float time_end = glfwGetTime();
 		float time_elapse = time_end - time_start;
-		Sleep(time_elapse * 1000);
+		if (time_elapse > loop_duration_) {
+			// if 3 consecutive frames are slow and VERBOSE, print message
+			if (last_frame_slow && second_last_frame_slow && VERBOSE)
+				printf("Warning: the frame rate is too high. It took %.3f seconds for last frame.\n", time_elapse);
+			last_frame_slow = true;
+		}
+		else {
+			Sleep((loop_duration_ - time_elapse) * 1000);
+			last_frame_slow = false;
+		}
+		second_last_frame_slow = last_frame_slow;
 	}
 
 	glDeleteVertexArrays(1, &sphere_VAO_);
@@ -359,19 +372,24 @@ void DemoSystem::renderSpheres() {
 void DemoSystem::testPerformance(uint test_iters) {
 	LARGE_INTEGER frequency, startCount, stopCount;
 	BOOL ret;
+	// warm up
+	for (uint i = 0; i < 10; ++i) {
+		engine_->update(simulation_timestep_);
+	}
 
 	// us level timer
 	ret = QueryPerformanceFrequency(&frequency);
 	if (ret) {
 		ret = QueryPerformanceCounter(&startCount);
 	}
+	
 	for (uint i = 0; i < test_iters; ++i) {
-		engine_->update(0.1f);
+		engine_->update(simulation_timestep_);
 	}
 	if (ret) {
 		QueryPerformanceCounter(&stopCount);
-		LONGLONG elapsed = (stopCount.QuadPart - startCount.QuadPart) * 1000000 / frequency.QuadPart;
-		printf("QueryPerformanceFrequency & QueryPerformanceCounter = %ld us", elapsed);
+		double elapsed = (stopCount.QuadPart - startCount.QuadPart) / (double)frequency.QuadPart;
+		printf("Simulating %d iterations costs %.4lf seconds.\n", test_iters, elapsed);
 	}
 }
 
@@ -417,7 +435,8 @@ uint DemoSystem::loadTexture(char const * path) {
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
 		stbi_image_free(data);
-	} else {
+	} 
+	else {
 		std::cout << "Texture failed to load at path: " << path << std::endl;
 		stbi_image_free(data);
 	}

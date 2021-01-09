@@ -9,12 +9,12 @@
 #include <cuda_runtime.h>
 #include <helper_cuda.h>
 #include <helper_functions.h>
-#include "thrust/device_ptr.h"
-#include "thrust/sort.h"
+#include <thrust/device_ptr.h>
+#include <thrust/sort.h>
 
-#include "global.h"
 #include "dSimulationKernel.cuh"
 
+typedef unsigned int uint;
 
 extern "C" {
     void cudaInit(int argc, char **argv) {
@@ -61,106 +61,60 @@ extern "C" {
 		checkCudaErrors(cudaMemcpyToSymbol(d_protos, h_protos, sizeof(SimulationSphereProto)));
     }
 
-    //Round a / b to nearest higher integer value
-    uint iDivUp(uint a, uint b) {
-        return (a % b != 0) ? (a / b + 1) : (a / b);
-    }
+	void dSimulateFast(float * pos_s, float * velo_s, float * velo_delta_s, uint * types, 
+		uint * hashes, uint * indices, uint * cell_start, uint * cell_end, 
+		float elapse, uint sphere_num, uint max_hash_value) {
+		uint num_threads, num_blocks;
+		num_threads = min(256, sphere_num);
+		num_blocks = (sphere_num + num_threads - 1) / num_threads;
 
-    // compute grid and thread block size for a given number of elements
-    void computeGridSize(uint n, uint blockSize, uint &numBlocks, uint &numThreads) {
-        numThreads = min(blockSize, n);
-		numBlocks = (n + numThreads - 1) / numThreads; //    iDivUp(n, numThreads);
-    }
-
-    void dHashifyAndSort(
-		uint  *hashes, 
-		uint  *indices, 
-		float *pos, 
-		uint sphere_num) {
-        uint numThreads, numBlocks;
-        computeGridSize(sphere_num, 256, numBlocks, numThreads);
-		
 		// parallelly calculate the hash value of every sphere
-		hashifyKernel <<< numBlocks, numThreads >>> (
+		hashifyKernel <<< num_blocks, num_threads >>> (
 			hashes,
 			indices,
-			(float3 *) pos);
+			(float3 *)pos_s);
 
-		getLastCudaError("Kernel execution failed: hashify");
+		getLastCudaError("HashifyKernel execution failed: hashify");
 
 		// use thrust radix sort to sort the hashes
 		thrust::sort_by_key(
 			thrust::device_ptr<uint>(hashes),
 			thrust::device_ptr<uint>(hashes + sphere_num),
 			thrust::device_ptr<uint>(indices));
-    }
 
-    void dCollectCells(
-		uint *cell_start,
-		uint *cell_end,
-		uint *hash,
-		uint sphere_num,
-		uint max_hash_value) {
-        uint numThreads, numBlocks;
-        computeGridSize(sphere_num, 256, numBlocks, numThreads);
-
-        // set all cells to empty
-        checkCudaErrors(cudaMemset(cell_start, 0xffffffff, max_hash_value *sizeof(uint)));
+		// set all cells to empty
+		checkCudaErrors(cudaMemset(cell_start, 0xffffffff, max_hash_value * sizeof(uint)));
 
 		// parallelly find out all the locations where a cell starts or ends
-        collectCellsKernel <<< numBlocks, numThreads >>>(
-            cell_start,
-            cell_end,
-            hash);
-		
-        getLastCudaError("Kernel execution failed: collectCells");
-    }
+		collectCellsKernel <<< num_blocks, num_threads >>> (
+			cell_start,
+			cell_end,
+			hashes);
 
-    void dNarrowPhaseCollisionDetection(
-		float *velo_delta_s,
-		float *pos_s,
-		float *velo_s,
-		uint *types,
-		uint  *indices_sorted,
-		uint  *cell_start,
-		uint  *cell_end,
-		uint   sphere_num) {
-        uint numThreads, numBlocks;
-        computeGridSize(sphere_num, 64, numBlocks, numThreads);
+		getLastCudaError("CollectCellsKernel execution failed: collectCells");
 
-        // execute the kernel
-		collisionKernel <<< numBlocks, numThreads >>> (
-			(float3 *) velo_delta_s,
-			(float3 *) pos_s,
-			(float3 *) velo_s,
+		// execute the kernel
+		collisionKernel <<< num_blocks, num_threads >>> (
+			(float3 *)velo_delta_s,
+			(float3 *)pos_s,
+			(float3 *)velo_s,
 			types,
-			indices_sorted,
+			indices,
 			cell_start,
 			cell_end);
 
-        // check if kernel invocation generated an error
-        getLastCudaError("Kernel execution failed");
-    }
-
-	void dUpdateDynamics(
-		float *pos_s,
-		float *velo_s,
-		float *velo_delta_s,
-		uint *types,
-		float elapse,
-		uint sphere_num) {
-		uint numThreads, numBlocks;
-		computeGridSize(sphere_num, 256, numBlocks, numThreads);
+		// check if kernel invocation generated an error
+		getLastCudaError("CollisionKernel execution failed");
 
 		// parallelly update the position and velocity of each sphere
-		updateDynamicsKernel << < numBlocks, numThreads >> > (
+		updateDynamicsKernel <<<  num_blocks, num_threads >>> (
 			(float3 *)pos_s,
 			(float3 *)velo_s,
 			(float3 *)velo_delta_s,
 			types,
 			elapse);
 
-		getLastCudaError("Kernel execution failed");
+		getLastCudaError("UpdateDynamicsKernel execution failed");
 	}
 
 }   // extern "C"

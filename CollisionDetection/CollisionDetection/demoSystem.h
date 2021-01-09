@@ -18,12 +18,13 @@
 
 class DemoSystem {
 public:
-	DemoSystem(bool render_mode = true, 
+	DemoSystem(uint sphere_num, 
+		bool render_mode,
+		bool gpu_mode,
 		bool use_spotlight = false, 
 		bool immersive_mode_ = false, 
 		float simulation_timestep = 0.1f,
 		uint frame_rate = FRAME_RATE, 
-		uint sphere_num = SPHERE_NUM, 
 		glm::vec3 origin = glm::vec3(0.0f, 0.0f, 0.0f),
 		glm::vec3 room_size = glm::vec3(1.0f, 1.0f, 1.0f));
 

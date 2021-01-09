@@ -23,11 +23,12 @@ enum InitMode {
 class PhysicsEngine {
 public:
 	PhysicsEngine(uint sphere_num, 
+		bool gpu_mode,
 		glm::vec3 origin, 
 		glm::vec3 room_size, 
 		uint hash_block=HASH_BLOCK, 
-		bool gpu_mode= GPU_MODE,
-		InitMode init_mode= RANDOM_MODE);
+		bool brutal_mode = BRUTAL_MODE,
+		InitMode init_mode= CUBE_MODE);
 
 	~PhysicsEngine();
 
@@ -37,6 +38,7 @@ public:
 	// simulate the collision and motion of all spheres in given amount of time (elapse) 
 	void update(float elapse);
 
+	// get the sphere types for rendering
 	uint *getSphereType() { return h_type_; }
 
 protected:
@@ -59,44 +61,47 @@ protected:
 	// use GPU for calculation or not
 	bool gpu_mode_;
 
-	uint sphere_num_;
-	// CPU data
-	float *h_pos_;              // particle positions
-	float *h_velo_;              // particle velocities
-	float *h_velo_delta_;
-
-	float *h_color_;
-	uint *h_type_;
-
-	uint  *h_hash_; // grid hash value for each particle
-	uint  *h_index_sorted_;// particle index for each particle
-	uint  *h_cell_start_;        // index of start of each cell in sorted list
-	uint  *h_cell_end_;          // index of end of cell
+	// if use CPU, whether use brutal method
+	bool brutal_mode_;
 	
+	// number of spheres
+	uint sphere_num_;
 
+	// CPU data
+	float *h_pos_; // positions
+	float *h_velo_;  // velocities
+	float *h_velo_delta_; // velocity changes
+	uint *h_type_; // sphere types
+
+	uint  *h_hash_; // hash values
+	uint  *h_index_sorted_; // sorted indices
+	uint  *h_cell_start_; // sphere index for the start of each cell
+	uint  *h_cell_end_; // sphere index for the end of each cell
+	
 	// GPU data
-	float *d_pos_;        // these are the CUDA deviceMem Pos
+	float *d_pos_;
 	float *d_velo_;
 	float *d_velo_delta_;
 	uint *d_type_;
 
-	// grid data for sorting method
-	uint  *d_hash_; // grid hash value for each particle
-	uint  *d_index_sorted_;// particle index for each particle
-	uint  *d_cell_start_;        // index of start of each cell in sorted list
-	uint  *d_cell_end_;          // index of end of cell
+	uint  *d_hash_; 
+	uint  *d_index_sorted_;
+	uint  *d_cell_start_;
+	uint  *d_cell_end_;
 
+	// simulation environment
 	SimulationEnv env_;
 	SimulationSphereProto protos_;
+	InitMode init_mode_; // sphere position initialization mode
+
+	// values for hashing and dividing space
 	uint hash_block_;
 	uint max_hash_value_;
 	float cell_size_;
 
+	// room origin and size
 	glm::vec3 origin_;
 	glm::vec3 room_size_;
-
-	InitMode init_mode_;
-
 };
 
 #endif // !PHYSICSENGINE_H

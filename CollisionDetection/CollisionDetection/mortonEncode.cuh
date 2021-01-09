@@ -1,6 +1,6 @@
 /*
-  * implementation of the z-order curve (or Morton encoding)
-  * reference: https://fgiesen.wordpress.com/2009/12/13/decoding-morton-codes/
+  * both CPU and GPU implementation of the z-order curve (or Morton encoding)
+  * reference (minor modification): https://fgiesen.wordpress.com/2009/12/13/decoding-morton-codes/
   * reference: https://john.cs.olemiss.edu/~rhodes/papers/Nocentino10.pdf
   */
 

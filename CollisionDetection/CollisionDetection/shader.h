@@ -1,6 +1,6 @@
 /*
  * This file defines a shader class which helps to initialize and use the shader program
- * reference: https://learnopengl.com/code_viewer_gh.php?code=includes/learnopengl/shader.h
+ * reference (minor modification): https://learnopengl.com/code_viewer_gh.php?code=includes/learnopengl/shader.h
  */
 
 #ifndef SHADER_H
@@ -14,7 +14,7 @@
 #include <sstream>
 #include <iostream>
 
-#include "global.h"
+typedef unsigned int uint;
 
 class Shader
 {
@@ -145,5 +145,6 @@ private:
         }
     }
 };
+
 #endif
 

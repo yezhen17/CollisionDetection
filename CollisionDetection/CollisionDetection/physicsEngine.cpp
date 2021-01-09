@@ -2,13 +2,6 @@
  * Implementation of the physics engine
  */
 
-#include <assert.h>
-#include <math.h>
-#include <memory.h>
-#include <cstdio>
-#include <cstdlib>
-#include <algorithm>
-
 #include "physicsEngine.h"
 #include "dSimulation.cuh"
 #include "hSimulation.h"
@@ -16,9 +9,11 @@
 #include "sphere.h"
 
 
-PhysicsEngine::PhysicsEngine(uint sphere_num, glm::vec3 origin, glm::vec3 room_size, uint hash_block, bool gpu_mode, InitMode init_mode):
+PhysicsEngine::PhysicsEngine(uint sphere_num, bool gpu_mode, glm::vec3 origin, glm::vec3 room_size,
+	uint hash_block, bool brutal_mode, InitMode init_mode):
 	sphere_num_(sphere_num),
 	gpu_mode_(gpu_mode),
+	brutal_mode_(brutal_mode),
 	origin_(origin),
 	room_size_(room_size),
 	hash_block_(hash_block),
@@ -68,7 +63,8 @@ void PhysicsEngine::initMemory() {
 		copyHost2Device(d_type_, h_type_, 0, space_1xu);
 
 		dSetupSimulation(&env_, &protos_);
-	} else {
+	} 
+	else {
 		// allocate parameters for middle calculations in CPU memory
 		h_velo_delta_ = new float[sphere_num_ * 3];
 		h_hash_ = new uint[sphere_num_];
@@ -87,8 +83,8 @@ void PhysicsEngine::initMemory() {
 }
 
 void PhysicsEngine::initEnvironment() {
-	env_.max_hash_value = max_hash_value_;
 	env_.sphere_num = sphere_num_;
+	env_.max_hash_value = max_hash_value_;
 
 	float max_radius = 0.0f;
 	for (int i = 0; i < PROTOTYPE_NUM; ++i) {
@@ -99,7 +95,6 @@ void PhysicsEngine::initEnvironment() {
 		protos_.masses[i] = prototype.mass;
 		protos_.radii[i] = prototype.radius;
 	}
-	env_.max_radius = max_radius;
 
 	// cell size is equal to the maximum sphere radius * 2
 	cell_size_ = max_radius * 2.0f;  
@@ -110,8 +105,8 @@ void PhysicsEngine::initEnvironment() {
 	env_.max_corner = env_.min_corner + make_float3(room_size_.x, room_size_.y, room_size_.z);
 
 	float drag = 1.0f;
-	float gravity = 0.05f;//0.05f;
-	float stiffness = 2.5f;//2.5f;
+	float gravity = 0.1f;//0.05f;
+	float stiffness = 5.0f;//2.5f;
 	float damping = 0.0f; // 0.1f
 	float friction = 0.0f;
 	float boundary_damping = -0.5f;
@@ -123,7 +118,6 @@ void PhysicsEngine::initEnvironment() {
 	env_.friction = friction;
 }
 
-// TODO
 void PhysicsEngine::initSpheres() {
 	srand(2021);
 	
@@ -132,11 +126,16 @@ void PhysicsEngine::initSpheres() {
 		float jitter_magnitude = half_cell_size * 0.02f;
 		float velo_magnitude = half_cell_size * 0.02f;
 		uint x_num, y_num, z_num;
+		
+		// spread mode means that: starting from the top
+		// the spheres spread the whole x-z surface of that height constrained by the boundary
 		if (init_mode_ == SPREAD_MODE) {
 			x_num = (uint)ceilf(room_size_.x / cell_size_);
 			z_num = (uint)ceilf(room_size_.z / cell_size_);
 			y_num = (uint)ceilf((float)sphere_num_ / x_num / z_num);
 		}
+		// cube mode means that: starting from the top corner
+		// the spheres form a cube (as "cubic" as possible)
 		else {
 			x_num = (uint)ceilf(powf((float)sphere_num_, 1.0f / 3.0f));
 			y_num = (uint)ceilf(powf((float)sphere_num_, 1.0f / 3.0f));
@@ -161,29 +160,31 @@ void PhysicsEngine::initSpheres() {
 			}
 		}
 	}
+	// random mode means that: split the room into blocks (size = 2*cell size)
+	// and put spheres randomly into blocks
 	else {
-		assert(sphere_num_ < 1000);
+		float block_size = 2 * cell_size_;
+		uint block_num_x = (uint)floor(room_size_.x / block_size);
+		uint block_num_y = (uint)floor(room_size_.y / block_size);
+		uint block_num_z = (uint)floor(room_size_.z / block_size);
 
-		glm::vec3 block_size = room_size_ / 10.0f;
-		glm::vec3 jitter_magnitude = (block_size - cell_size_) * 0.8f;
-		glm::vec3 velo_magnitude = block_size * 0.02f;
-		for (int i = 0; i < sphere_num_; ++i) {
-			uint index = rand() % 1000;
-			uint x = index % 10;
-			uint z = (index / 10) % 10;
-			uint y = (index / 10) / 10;
-			h_pos_[i * 3] = origin_.x + block_size.x * (x + 0.5f) + genJitter(jitter_magnitude.x);
-			h_pos_[i * 3 + 1] = origin_.y + block_size.y * (y + 0.5f) + genJitter(jitter_magnitude.y);
-			h_pos_[i * 3 + 2] = origin_.z + block_size.z * (z + 0.5f) + genJitter(jitter_magnitude.z);
-			h_velo_[i * 3] = genJitter(velo_magnitude.x);
-			h_velo_[i * 3 + 1] = genJitter(velo_magnitude.y);
-			h_velo_[i * 3 + 2] = genJitter(velo_magnitude.z);
+		float jitter_magnitude = (block_size - cell_size_) * 0.8f;
+		float velo_magnitude = block_size * 0.02f;
+		for (uint i = 0; i < sphere_num_; ++i) {
+			uint index = rand() % (block_num_x * block_num_y * block_num_z);
+			uint x = index % block_num_x;
+			uint z = (index / block_num_x) % block_num_z;
+			uint y = (index / block_num_x) / block_num_z;
+			h_pos_[i * 3] = origin_.x + block_size * (x + 0.5f) + genJitter(jitter_magnitude);
+			h_pos_[i * 3 + 1] = origin_.y + block_size * (y + 0.5f) + genJitter(jitter_magnitude);
+			h_pos_[i * 3 + 2] = origin_.z + block_size * (z + 0.5f) + genJitter(jitter_magnitude);
+			h_velo_[i * 3] = genJitter(velo_magnitude);
+			h_velo_[i * 3 + 1] = genJitter(velo_magnitude);
+			h_velo_[i * 3 + 2] = genJitter(velo_magnitude);
 			uint proto_id = rand() % PROTOTYPE_NUM;
 			h_type_[i] = proto_id;
 		}
 	}
-
-	
 }
 
 void PhysicsEngine::releaseMemory() {
@@ -200,7 +201,8 @@ void PhysicsEngine::releaseMemory() {
 		freeArray(d_index_sorted_);
 		freeArray(d_cell_start_);
 		freeArray(d_cell_end_);
-	} else {
+	} 
+	else {
 		delete[] h_velo_delta_;
 		delete[] h_hash_;
 		delete[] h_index_sorted_;
@@ -224,7 +226,19 @@ float * PhysicsEngine::outputPos() {
 void PhysicsEngine::update(float elapse) {
 	// choose CPU or GPU to do the calculation
 	if (gpu_mode_) {
-		dHashifyAndSort(
+		dSimulateFast(
+			d_pos_,
+			d_velo_,
+			d_velo_delta_,
+			d_type_,
+			d_hash_,
+			d_index_sorted_,
+			d_cell_start_,
+			d_cell_end_,
+			elapse,
+			sphere_num_,
+			max_hash_value_);
+		/*dHashifyAndSort(
 			d_hash_,
 			d_index_sorted_,
 			d_pos_,
@@ -253,37 +267,28 @@ void PhysicsEngine::update(float elapse) {
 			d_velo_delta_,
 			d_type_,
 			elapse,
-			sphere_num_);
-	} else {
-		hHashifyAndSort(
-			h_hash_,
-			h_index_sorted_,
-			(float3 *)h_pos_,
-			sphere_num_);
-
-		hCollectCells(
-			h_cell_start_,
-			h_cell_end_,
-			h_hash_,
-			sphere_num_,
-			max_hash_value_);
-
-		hNarrowPhaseCollisionDetection(
-			(float3 *)h_velo_delta_,
-			(float3 *)h_pos_,
-			(float3 *)h_velo_,
-			h_type_,
-			h_index_sorted_,
-			h_cell_start_,
-			h_cell_end_,
-			sphere_num_);
-
-		hUpdateDynamics(
-			(float3 *)h_pos_,
-			(float3 *)h_velo_,
-			(float3 *)h_velo_delta_,
-			h_type_,
-			elapse,
-			sphere_num_);
+			sphere_num_);*/
+	}
+	else {
+		if (brutal_mode_) {
+			hSimulateBrutal(
+				h_pos_,
+				h_velo_,
+				h_velo_delta_,
+				h_type_,
+				elapse);
+		}
+		else {
+			hSimulateFast(
+				h_pos_,
+				h_velo_,
+				h_velo_delta_,
+				h_type_,
+				h_hash_,
+				h_index_sorted_,
+				h_cell_start_,
+				h_cell_end_,
+				elapse);
+		}
 	}
 }

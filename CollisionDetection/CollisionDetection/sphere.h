@@ -8,7 +8,7 @@
 
 #include <glm/glm.hpp>
 
-#include "global.h"
+typedef unsigned int uint;
 
 typedef struct Sphere {
 	float mass;

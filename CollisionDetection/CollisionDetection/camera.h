@@ -1,6 +1,6 @@
 /*
  * This file defines a camera class which always points to the origin
- * reference: https://learnopengl.com/code_viewer_gh.php?code=src/1.getting_started/7.3.camera_mouse_zoom/camera_mouse_zoom.cpp
+ * reference (major modification): https://learnopengl.com/code_viewer_gh.php?code=src/1.getting_started/7.3.camera_mouse_zoom/camera_mouse_zoom.cpp
  */
 
 #ifndef CAMERA_H
