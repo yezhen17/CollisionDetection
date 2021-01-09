@@ -55,9 +55,9 @@ void hSetupSimulation(SimulationEnv *env, SimulationSphereProto *stats) {
 // calculate position in uniform grid
 int3 hConvertWorldPosToGrid(float3 world_pos) {
 	int3 grid_pos;
-	grid_pos.x = floor(world_pos.x / h_env->cell_size.x);
-	grid_pos.y = floor(world_pos.y / h_env->cell_size.y);
-	grid_pos.z = floor(world_pos.z / h_env->cell_size.z);
+	grid_pos.x = floor(world_pos.x / h_env->cell_size);
+	grid_pos.y = floor(world_pos.y / h_env->cell_size);
+	grid_pos.z = floor(world_pos.z / h_env->cell_size);
 	return grid_pos;
 }
 
@@ -103,8 +103,8 @@ uint hHashFunc(int3 grid_pos) {
 	 uint   *cell_end,
 	 uint   *hashes,
 	 uint sphere_num,
-	 uint cell_num) {
-	 memset(cell_start, (unsigned char) 0xff, cell_num * sizeof(uint));
+	 uint max_hash_value) {
+	 memset(cell_start, (unsigned char) 0xff, max_hash_value * sizeof(uint));
 	 for (uint i = 0; i < sphere_num; ++i) {
 		 uint hash = hashes[i];
 		 if (i == 0) {

@@ -16,45 +16,38 @@
 #include "sphere.h"
 
 
-PhysicsEngine::PhysicsEngine(uint sphere_num, glm::vec3 origin, glm::vec3 room_size, uint grid_size, bool gpu_mode):
+PhysicsEngine::PhysicsEngine(uint sphere_num, glm::vec3 origin, glm::vec3 room_size, uint hash_block, bool gpu_mode, InitMode init_mode):
 	sphere_num_(sphere_num),
 	gpu_mode_(gpu_mode),
 	origin_(origin),
-	room_size_(room_size) {
-	// grid_size_.x = grid_size_.y = grid_size_.z = grid_size;
-	// grid_exp_.x = grid_exp_.y = grid_exp_.z = (int) ceil(log2(grid_size));
-	cell_num_ = grid_size * grid_size * grid_size; //grid_size_.x * grid_size_.y * grid_size_.z;
-	// printf("%d", grid_exp_.x);
+	room_size_(room_size),
+	hash_block_(hash_block),
+	max_hash_value_(hash_block * hash_block * hash_block),
+    init_mode_(init_mode) {
+	initMemory();
+}
 
+PhysicsEngine::~PhysicsEngine() {
+	releaseMemory();
+}
+
+void PhysicsEngine::initMemory() {
 	// allocate CPU memory
-	uint space_1xf = sizeof(float) * sphere_num;
+	uint space_1xf = sizeof(float) * sphere_num_;
 	uint space_3xf = space_1xf * 3;
-	uint space_1xu = sizeof(uint) * sphere_num;
+	uint space_1xu = sizeof(uint) * sphere_num_;
+
+	h_pos_ = new float[sphere_num_ * 3];
+	h_velo_ = new float[sphere_num_ * 3];
+	h_type_ = new uint[sphere_num_];
 	
-	h_pos_ = new float[sphere_num * 3];
-	h_velo_ = new float[sphere_num * 3];
-	h_velo_delta_ = new float[sphere_num * 3];
-	h_type_ = new uint[sphere_num];
-
-	// allocate parameters for middle calculations in CPU memory
-	h_hash_ = new uint[sphere_num];
-	h_index_sorted_ = new uint[sphere_num];
-	h_cell_start_ = new uint[cell_num_];
-	h_cell_end_ = new uint[cell_num_];
-
 	memset(h_pos_, 0, space_3xf);
 	memset(h_velo_, 0, space_3xf);
-	memset(h_velo_delta_, 0, space_3xf);
 	memset(h_type_, 0, space_1xu);
-	memset(h_hash_, 0, space_1xf);
-	memset(h_index_sorted_, 0, space_1xf);
-	memset(h_cell_start_, 0, cell_num_ * sizeof(uint));
-	memset(h_cell_end_, 0, cell_num_ * sizeof(uint));
-
+	
 	initEnvironment();
 	initSpheres();
-	hSetupSimulation(&env_, &protos_);
-
+	
 	if (gpu_mode_) {
 		// allocate GPU data
 		allocateArray((void **)&d_pos_, space_3xf);
@@ -66,28 +59,137 @@ PhysicsEngine::PhysicsEngine(uint sphere_num, glm::vec3 origin, glm::vec3 room_s
 		// allocate parameters for middle calculations on GPU
 		allocateArray((void **)&d_hash_, space_1xu);
 		allocateArray((void **)&d_index_sorted_, space_1xu);
-		allocateArray((void **)&d_cell_start_, cell_num_ * sizeof(uint));
-		allocateArray((void **)&d_cell_end_, cell_num_ * sizeof(uint));
+		allocateArray((void **)&d_cell_start_, max_hash_value_ * sizeof(uint));
+		allocateArray((void **)&d_cell_end_, max_hash_value_ * sizeof(uint));
 
 		// copy these initialized values to GPU
-		copyHost2Device(d_pos_, h_pos_, 0, sphere_num_ * 3 * sizeof(float));
-		copyHost2Device(d_velo_, h_velo_, 0, sphere_num_ * 3 * sizeof(float));
-		copyHost2Device(d_type_, h_type_, 0, sphere_num_ * sizeof(uint));
+		copyHost2Device(d_pos_, h_pos_, 0, space_3xf);
+		copyHost2Device(d_velo_, h_velo_, 0, space_3xf);
+		copyHost2Device(d_type_, h_type_, 0, space_1xu);
 
 		dSetupSimulation(&env_, &protos_);
+	} else {
+		// allocate parameters for middle calculations in CPU memory
+		h_velo_delta_ = new float[sphere_num_ * 3];
+		h_hash_ = new uint[sphere_num_];
+		h_index_sorted_ = new uint[sphere_num_];
+		h_cell_start_ = new uint[max_hash_value_];
+		h_cell_end_ = new uint[max_hash_value_];
+
+		memset(h_velo_delta_, 0, space_3xf);
+		memset(h_hash_, 0, space_1xf);
+		memset(h_index_sorted_, 0, space_1xf);
+		memset(h_cell_start_, 0, max_hash_value_ * sizeof(uint));
+		memset(h_cell_end_, 0, max_hash_value_ * sizeof(uint));
+		
+		hSetupSimulation(&env_, &protos_);
 	}
 }
 
-PhysicsEngine::~PhysicsEngine() {
-	// release all memory, CPU or GPU
+void PhysicsEngine::initEnvironment() {
+	env_.max_hash_value = max_hash_value_;
+	env_.sphere_num = sphere_num_;
+
+	float max_radius = 0.0f;
+	for (int i = 0; i < PROTOTYPE_NUM; ++i) {
+		Sphere prototype = PROTOTYPES[i];
+		if (prototype.radius > max_radius) {
+			max_radius = prototype.radius;
+		}
+		protos_.masses[i] = prototype.mass;
+		protos_.radii[i] = prototype.radius;
+	}
+	env_.max_radius = max_radius;
+
+	// cell size is equal to the maximum sphere radius * 2
+	cell_size_ = max_radius * 2.0f;  
+	env_.cell_size = cell_size_;
+
+	// the two extreme corners of the room
+	env_.min_corner = make_float3(origin_.x, origin_.y, origin_.z);
+	env_.max_corner = env_.min_corner + make_float3(room_size_.x, room_size_.y, room_size_.z);
+
+	float drag = 1.0f;
+	float gravity = 0.05f;//0.05f;
+	float stiffness = 2.5f;//2.5f;
+	float damping = 0.0f; // 0.1f
+	float friction = 0.0f;
+	float boundary_damping = -0.5f;
+	env_.drag = drag;
+	env_.gravity = make_float3(0.0f, -gravity, 0.0f);
+	env_.stiffness = stiffness;
+	env_.damping = damping;
+	env_.boundary_damping = boundary_damping;
+	env_.friction = friction;
+}
+
+// TODO
+void PhysicsEngine::initSpheres() {
+	srand(2021);
+	
+	if (init_mode_ == SPREAD_MODE || init_mode_ == CUBE_MODE) {
+		float half_cell_size = cell_size_ * 0.5f;
+		float jitter_magnitude = half_cell_size * 0.02f;
+		float velo_magnitude = half_cell_size * 0.02f;
+		uint x_num, y_num, z_num;
+		if (init_mode_ == SPREAD_MODE) {
+			x_num = (uint)ceilf(room_size_.x / cell_size_);
+			z_num = (uint)ceilf(room_size_.z / cell_size_);
+			y_num = (uint)ceilf((float)sphere_num_ / x_num / z_num);
+		}
+		else {
+			x_num = (uint)ceilf(powf((float)sphere_num_, 1.0f / 3.0f));
+			y_num = (uint)ceilf(powf((float)sphere_num_, 1.0f / 3.0f));
+			z_num = (uint)ceilf(powf((float)sphere_num_, 1.0f / 3.0f));
+		}
+		
+		for (uint y = 0; y < y_num; y++) {
+			for (uint z = 0; z < z_num; z++) {
+				for (uint x = 0; x < x_num; x++) {
+					uint index = (y * z_num + z) * x_num + x;
+					if (index < sphere_num_) {
+						h_pos_[index * 3] = origin_.x + cell_size_ * x + half_cell_size + genJitter(jitter_magnitude);
+						h_pos_[index * 3 + 1] = origin_.y + room_size_.y - cell_size_ * (y_num - 1 - y) - half_cell_size + genJitter(jitter_magnitude);
+						h_pos_[index * 3 + 2] = origin_.z + cell_size_ * z + half_cell_size + genJitter(jitter_magnitude);
+						h_velo_[index * 3] = genJitter(velo_magnitude);
+						h_velo_[index * 3 + 1] = genJitter(velo_magnitude);
+						h_velo_[index * 3 + 2] = genJitter(velo_magnitude);
+						uint proto_id = rand() % PROTOTYPE_NUM;
+						h_type_[index] = proto_id;
+					}
+				}
+			}
+		}
+	}
+	else {
+		assert(sphere_num_ < 1000);
+
+		glm::vec3 block_size = room_size_ / 10.0f;
+		glm::vec3 jitter_magnitude = (block_size - cell_size_) * 0.8f;
+		glm::vec3 velo_magnitude = block_size * 0.02f;
+		for (int i = 0; i < sphere_num_; ++i) {
+			uint index = rand() % 1000;
+			uint x = index % 10;
+			uint z = (index / 10) % 10;
+			uint y = (index / 10) / 10;
+			h_pos_[i * 3] = origin_.x + block_size.x * (x + 0.5f) + genJitter(jitter_magnitude.x);
+			h_pos_[i * 3 + 1] = origin_.y + block_size.y * (y + 0.5f) + genJitter(jitter_magnitude.y);
+			h_pos_[i * 3 + 2] = origin_.z + block_size.z * (z + 0.5f) + genJitter(jitter_magnitude.z);
+			h_velo_[i * 3] = genJitter(velo_magnitude.x);
+			h_velo_[i * 3 + 1] = genJitter(velo_magnitude.y);
+			h_velo_[i * 3 + 2] = genJitter(velo_magnitude.z);
+			uint proto_id = rand() % PROTOTYPE_NUM;
+			h_type_[i] = proto_id;
+		}
+	}
+
+	
+}
+
+void PhysicsEngine::releaseMemory() {
 	delete[] h_pos_;
-	delete[] h_velo_; 
-	delete[] h_velo_delta_;
+	delete[] h_velo_;
 	delete[] h_type_;
-	delete[] h_hash_;
-	delete[] h_index_sorted_;
-	delete[] h_cell_start_;
-	delete[] h_cell_end_;
 
 	if (gpu_mode_) {
 		freeArray(d_velo_);
@@ -98,70 +200,17 @@ PhysicsEngine::~PhysicsEngine() {
 		freeArray(d_index_sorted_);
 		freeArray(d_cell_start_);
 		freeArray(d_cell_end_);
+	} else {
+		delete[] h_velo_delta_;
+		delete[] h_hash_;
+		delete[] h_index_sorted_;
+		delete[] h_cell_start_;
+		delete[] h_cell_end_;
 	}
 }
 
-void PhysicsEngine::initEnvironment() {
-	// env_.grid_exp = grid_exp_;
-	// env_.grid_size = grid_size_;
-	env_.cell_num = cell_num_;
-	env_.sphere_num = sphere_num_;
-
-	env_.max_radius = 1.0f / 32.0f;
-
-	float cell_size = env_.max_radius * 2.0f;  // cell size equal to particle diameter
-	env_.cell_size = make_float3(cell_size, cell_size, cell_size);
-
-	env_.min_corner = make_float3(origin_.x, origin_.y, origin_.z);
-	env_.max_corner = env_.min_corner + make_float3(room_size_.x, room_size_.y, room_size_.z);
-
-	float drag = 0.99999f;
-	float gravity = 0.05f;//0.001f;
-	float stiffness = 2.5f;//0.5f;
-	float damping = 0.1f;
-	float friction = 0.0f;
-	float boundary_damping = -0.5f;
-	env_.drag = drag;
-	env_.gravity = make_float3(0.0f, -gravity, 0.0f);
-	env_.stiffness = stiffness;
-	env_.damping = damping;
-	env_.boundary_damping = boundary_damping;
-	env_.friction = friction;
-
-	for (uint i = 0; i < PROTOTYPE_NUM; ++i) {
-		Sphere prototype = PROTOTYPES[i];
-		protos_.masses[i] = prototype.mass;
-		protos_.radii[i] = prototype.radius;
-	}
-}
-
-// TODO
-void PhysicsEngine::initSpheres() {
-	float jitter = env_.max_radius*0.01f;
-	uint s = (int)ceilf(powf((float)sphere_num_, 1.0f / 3.0f));
-	uint grid_size[3];
-	grid_size[0] = grid_size[1] = grid_size[2] = s;
-	srand(2021);
-
-	for (uint z = 0; z < grid_size[2]; z++) {
-		for (uint y = 0; y < grid_size[1]; y++) {
-			for (uint x = 0; x < grid_size[0]; x++) {
-				uint i = (z*grid_size[1] * grid_size[0]) + (y*grid_size[0]) + x;
-
-				if (i < sphere_num_) {
-					h_pos_[i * 3] = (env_.max_radius*2.0f * x + env_.max_radius + (rand() / (float)RAND_MAX*2.0f - 1.0f)*jitter);
-					h_pos_[i * 3 + 1] = (env_.max_radius*2.0f * y + env_.max_radius + (rand() / (float)RAND_MAX*2.0f - 1.0f)*jitter) + 0.2f;
-					h_pos_[i * 3 + 2] = (env_.max_radius*2.0f * z + env_.max_radius + (rand() / (float)RAND_MAX*2.0f - 1.0f)*jitter);
-					h_velo_[i * 3] = 0.0f;
-					h_velo_[i * 3 + 1] = 0.0f;
-					h_velo_[i * 3 + 2] = 0.0f;
-
-					uint proto_id = rand() % PROTOTYPE_NUM;
-					h_type_[i] = proto_id;
-				}
-			}
-		}
-	}
+float PhysicsEngine::genJitter(float magnitude) {
+	return (rand() / (float)RAND_MAX*2.0f - 1.0f) * magnitude;
 }
 
 float * PhysicsEngine::outputPos() {
@@ -186,7 +235,7 @@ void PhysicsEngine::update(float elapse) {
 			d_cell_end_,
 			d_hash_,
 			sphere_num_,
-			cell_num_);
+			max_hash_value_);
 
 		dNarrowPhaseCollisionDetection(
 			d_velo_delta_,
@@ -217,7 +266,7 @@ void PhysicsEngine::update(float elapse) {
 			h_cell_end_,
 			h_hash_,
 			sphere_num_,
-			cell_num_);
+			max_hash_value_);
 
 		hNarrowPhaseCollisionDetection(
 			(float3 *)h_velo_delta_,

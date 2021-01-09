@@ -1,15 +1,6 @@
 /*
- * Copyright 1993-2015 NVIDIA Corporation.  All rights reserved.
- *
- * Please refer to the NVIDIA end user license agreement (EULA) associated
- * with this source code for terms and conditions that govern your use of
- * this software. Any use, reproduction, disclosure, or distribution of
- * this software and related documentation outside the terms of the EULA
- * is strictly prohibited.
+ * The implementation of GPU basic functions and simulation functions
  */
-
-// This file contains C wrappers around the some of the CUDA API and the
-// kernel functions so that they can be called from "particleSystem.cpp"
 
 #include <cstdlib>
 #include <cstdio>
@@ -109,12 +100,12 @@ extern "C" {
 		uint *cell_end,
 		uint *hash,
 		uint sphere_num,
-		uint cell_num) {
+		uint max_hash_value) {
         uint numThreads, numBlocks;
         computeGridSize(sphere_num, 256, numBlocks, numThreads);
 
         // set all cells to empty
-        checkCudaErrors(cudaMemset(cell_start, 0xffffffff, cell_num *sizeof(uint)));
+        checkCudaErrors(cudaMemset(cell_start, 0xffffffff, max_hash_value *sizeof(uint)));
 
 		// parallelly find out all the locations where a cell starts or ends
         collectCellsKernel <<< numBlocks, numThreads >>>(

@@ -53,9 +53,9 @@ __constant__ int3 neighboorhood_3[27] = {
 // calculate position in uniform grid
 __device__ int3 convertWorldPosToGrid(float3 world_pos) {
 	int3 grid_pos;
-	grid_pos.x = floor(world_pos.x / d_env.cell_size.x);
-	grid_pos.y = floor(world_pos.y / d_env.cell_size.y);
-	grid_pos.z = floor(world_pos.z / d_env.cell_size.z);
+	grid_pos.x = floor(world_pos.x / d_env.cell_size);
+	grid_pos.y = floor(world_pos.y / d_env.cell_size);
+	grid_pos.z = floor(world_pos.z / d_env.cell_size);
 	return grid_pos;
 }
 

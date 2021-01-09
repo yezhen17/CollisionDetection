@@ -13,13 +13,21 @@
 #include "sphere.h"
 #include "environment.h"
 
+// three initialization modes of spheres
+enum InitMode {
+	SPREAD_MODE,
+	CUBE_MODE,
+	RANDOM_MODE
+};
+
 class PhysicsEngine {
 public:
 	PhysicsEngine(uint sphere_num, 
 		glm::vec3 origin, 
 		glm::vec3 room_size, 
-		uint grid_size=HASH_BLOCK, 
-		bool gpu_mode= GPU_MODE);
+		uint hash_block=HASH_BLOCK, 
+		bool gpu_mode= GPU_MODE,
+		InitMode init_mode= RANDOM_MODE);
 
 	~PhysicsEngine();
 
@@ -32,11 +40,20 @@ public:
 	uint *getSphereType() { return h_type_; }
 
 protected:
+	// initialize the CPU and GPU memory
+	void initMemory();
+
 	// initialize the environment
 	void initEnvironment();
 
 	// initialize the type, position and velocity of all spheres
 	void initSpheres();
+
+	// release the CPU and GPU memory
+	void releaseMemory();
+
+	// generate jitters with the given magnitude
+	float genJitter(float magnitude);
 
 protected:
 	// use GPU for calculation or not
@@ -69,16 +86,16 @@ protected:
 	uint  *d_cell_start_;        // index of start of each cell in sorted list
 	uint  *d_cell_end_;          // index of end of cell
 
-	uint   m_gridSortBits;
-
 	SimulationEnv env_;
 	SimulationSphereProto protos_;
-	uint3 grid_size_;
-	uint3 grid_exp_;
-	uint cell_num_;
+	uint hash_block_;
+	uint max_hash_value_;
+	float cell_size_;
 
 	glm::vec3 origin_;
 	glm::vec3 room_size_;
+
+	InitMode init_mode_;
 
 };
 

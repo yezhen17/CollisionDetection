@@ -7,18 +7,16 @@
 
 #include <vector_types.h>
 
-#include "global.h"
+typedef unsigned int uint;
 
 // simulation environment
 struct SimulationEnv {
-	uint3 grid_exp;
 	float3 gravity;
 	float drag;
 	float max_radius;
 
-	uint3 grid_size;
-	uint cell_num;
-	float3 cell_size;
+	uint max_hash_value;
+	float cell_size;
 
 	uint sphere_num;
 
@@ -29,8 +27,6 @@ struct SimulationEnv {
 
 	float3 min_corner;
 	float3 max_corner;
-
-	float e;
 };
 
 #endif

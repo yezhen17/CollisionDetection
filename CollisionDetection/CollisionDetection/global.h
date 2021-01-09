@@ -23,7 +23,7 @@ const uint PROTOTYPE_NUM = 7;  // maximum 7 prototypes
 const float MOUSE_SPEED = 2.5f;
 const float ZOOM_DEFAULT = 20.0f;
 
-const uint SPHERE_NUM = 1000;
+const uint SPHERE_NUM = 233;
 const uint FRAME_RATE = 25;
 
 const bool GPU_MODE = true;
