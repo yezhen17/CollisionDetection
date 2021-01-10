@@ -16,7 +16,7 @@ int main(int argc, char **argv) {
 	bool render_mode = RENDER_MODE_DEFAULT;
 	bool gpu_mode = GPU_MODE_DEFAULT;
 
-#if false // for debugging
+#if true // set false for debugging
 	char input;
 	bool skip = false;
 	std::cout << "Use default setting? Press [y] to use and any other key elsewise." << std::endl;
