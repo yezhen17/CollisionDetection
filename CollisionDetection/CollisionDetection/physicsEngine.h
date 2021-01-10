@@ -32,7 +32,7 @@ public:
 
 	~PhysicsEngine();
 
-	// output  updated sphere positions
+	// output updated sphere positions
 	float* outputPos();
 
 	// simulate the collision and motion of all spheres in given amount of time (elapse) 

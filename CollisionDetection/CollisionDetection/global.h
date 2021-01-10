@@ -26,26 +26,28 @@ const uint VERTICAL_FRAGMENT_NUM = 12;
 const uint WINDOW_WIDTH = 800;
 const uint WINDOW_HEIGHT = 800;
 
-const uint FRAME_RATE = 50;
-const uint SIMULATION_STEP = 5;
+const uint FRAME_RATE = 50; // how many rendering frames each second
+const uint SIMULATION_STEP = 5; // how many steps to execute each rendering frame
 
-const bool VERBOSE = true;
+const bool VERBOSE = true; // whether remind user the frame rate is too high
 
-const bool BRUTAL_MODE = false;
+const bool BRUTAL_MODE = false; // if use CPU mode, whether use brutal-force algorithm
+const bool IMMERSIVE_MODE = false; // whether hide the cursor
+const bool USE_SPOTLIGHT = false; // whether use spotlight (disable for less computation)
 
 // environment related
-const float DRAG = 0.99999f;
-const float GRAVITY = 0.2f;//0.05f;
-const float STIFFNESS = 1000.0f;//4.0f;
-const float DAMPING = 8.0f; // 0.02f
-const float FRICTION = 0.1f;
+const float DRAG = 0.9999f;
+const float GRAVITY = 0.2f;
+const float STIFFNESS = 1000.0f;
+const float DAMPING = 8.0f;
+const float FRICTION = 0.03f;
 
 // ---------------------------------------------------------------------------------------
 
 // can be modified by user
 // ---------------------------------------------------------------------------------------
 
-const uint SPHERE_NUM_DEFAULT = 10000;
+const uint SPHERE_NUM_DEFAULT = 8000;
 
 const bool RENDER_MODE_DEFAULT = true;
 const bool GPU_MODE_DEFAULT = true;

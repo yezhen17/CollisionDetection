@@ -22,9 +22,9 @@ typedef struct SimulationEnv {
 	// physical environment
 	float3 gravity; 
 	float drag; // global velocity decay factor
-	float stiffness; // assume stiffness is universal
-	float damping; // damping factor
-	float friction; // assume friction is universal
+	float stiffness; // assume stiffness factor is universal
+	float damping; // damping factor (the material irrelevant component)
+	float friction; // assume friction factor is universal
 
 } SimulationEnv;
 

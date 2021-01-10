@@ -54,10 +54,10 @@ const Sphere PROTOTYPES[4] = {
 
 // restitution coefficient when two prototypes collide
 const float RESTITUTION[4][4] = {
-	1.0f, 1.0f, 0.8f, 0.9f,
-	1.0f, 1.0f, 0.8f, 0.9f,
+	0.9f, 0.9f, 0.7f, 0.8f,
+	0.9f, 0.9f, 0.7f, 0.8f,
+	0.7f, 0.7f, 0.4f, 0.5f,
 	0.8f, 0.8f, 0.5f, 0.6f,
-	0.9f, 0.9f, 0.6f, 0.7f,
 	/*1.0f, 0.9f, 0.8f, 0.7f,
 	0.9f, 0.8f, 0.7f, 0.6f,
 	0.8f, 0.7f, 0.6f, 0.5f,

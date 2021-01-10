@@ -1,5 +1,6 @@
 /*
  * The implementation of GPU basic functions and simulation functions
+ * reference: CUDA 10.1 samples (particles)
  */
 
 #include <cuda_runtime.h>
@@ -35,10 +36,6 @@ extern "C" {
 
     void freeArray(void *dev_ptr) {
         checkCudaErrors(cudaFree(dev_ptr));
-    }
-
-    void threadSync() {
-        checkCudaErrors(cudaDeviceSynchronize());
     }
 
     void copyHost2Device(void *device, const void *host, int offset, int size) {

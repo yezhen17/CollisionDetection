@@ -13,8 +13,6 @@ extern "C"
 	void zeroizeArray(void *devPtr, uint size);
     void freeArray(void *devPtr);
 
-    void threadSync();
-
 	void copyDevice2Host(void *host, const void *device, int size);
     void copyHost2Device(void *device, const void *host, int offset, int size);
 

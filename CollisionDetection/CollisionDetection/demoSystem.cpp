@@ -137,7 +137,7 @@ void DemoSystem::initSpheres() {
 		odd_row = !odd_row;
 	}
 
-	sphere_index_count_ = vertex_indices.size();
+	sphere_index_count_ = (uint)vertex_indices.size();
 	std::vector<float> sphere_data;
 	for (std::size_t i = 0; i < vertices.size(); ++i) {
 		sphere_data.push_back(vertices[i].x);
@@ -192,13 +192,6 @@ void DemoSystem::initSpheres() {
 	glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(6 * sizeof(float)));
 	glEnableVertexAttribArray(2);
 
-	/*
-   Here we set all the uniforms for the 5/6 types of lights we have. We have to set them manually and index
-   the proper PointLight struct in the array to set each uniform variable. This can be done more code-friendly
-   by defining light types as classes and set their values in there, or by using a more efficient uniform approach
-   by using 'Uniform buffer objects', but that is something we'll discuss in the 'Advanced GLSL' tutorial.
-*/
-
 	// initialize model matrices for rendering background
 	model_matrices_ = { };
 	glm::mat4 model_base = glm::mat4(1.0f);
@@ -242,7 +235,7 @@ Shader *DemoSystem::initShader(char const * vs_path, char const * fs_path, uint 
 	// point light 1
 	shader->setVec3("pointLights[0].position", pointlight_positions_[0]);
 	shader->setVec3("pointLights[0].ambient", 0.2f, 0.2f, 0.2f);
-	shader->setVec3("pointLights[0].diffuse", 0.6f, 0.6f, 0.6f);
+	shader->setVec3("pointLights[0].diffuse", 0.8f, 0.8f, 0.8f);
 	shader->setVec3("pointLights[0].specular", 1.0f, 1.0f, 1.0f);
 	shader->setFloat("pointLights[0].constant", 1.0f);
 	shader->setFloat("pointLights[0].linear", 0.09f);// 0.09);
@@ -252,8 +245,8 @@ Shader *DemoSystem::initShader(char const * vs_path, char const * fs_path, uint 
 	//shader->setVec3("dirLight.direction", -0.2f, -1.0f, -0.3f);
 	shader->setVec3("dirLight.direction", -1.0f, -1.0f, -1.0f);
 	shader->setVec3("dirLight.ambient", 0.2f, 0.2f, 0.2f);
-	shader->setVec3("dirLight.diffuse", 0.3f, 0.3f, 0.3f);
-	shader->setVec3("dirLight.specular", 0.5f, 0.5f, 0.5f);
+	shader->setVec3("dirLight.diffuse", 0.5f, 0.5f, 0.5f);
+	shader->setVec3("dirLight.specular", 0.8f, 0.8f, 0.8f);
 
 	bool has_texture = texture_id != 0;
 	shader->setBool("HasTexture", has_texture);
@@ -262,12 +255,12 @@ Shader *DemoSystem::initShader(char const * vs_path, char const * fs_path, uint 
 
 	if (use_spotlight_) {
 		// spotlight from camera
-		shader->setVec3("spotLight.ambient", 0.0f, 0.0f, 0.0f);
+		shader->setVec3("spotLight.ambient", 0.1f, 0.1f, 0.1f);
 		shader->setVec3("spotLight.diffuse", 1.0f, 1.0f, 1.0f);
 		shader->setVec3("spotLight.specular", 1.0f, 1.0f, 1.0f);
 		shader->setFloat("spotLight.constant", 1.0f);
-		shader->setFloat("spotLight.linear", 0.09);
-		shader->setFloat("spotLight.quadratic", 0.032);
+		shader->setFloat("spotLight.linear", 0.09f);
+		shader->setFloat("spotLight.quadratic", 0.032f);
 		shader->setFloat("spotLight.cutOff", glm::cos(glm::radians(12.5f)));
 		shader->setFloat("spotLight.outerCutOff", glm::cos(glm::radians(15.0f)));
 	}
@@ -283,7 +276,7 @@ void DemoSystem::mainLoop() {
 	bool last_frame_slow = false;
 	bool second_last_frame_slow = false;
 	while (!glfwWindowShouldClose(window_)) {
-		float time_start = glfwGetTime();
+		float time_start = (float)glfwGetTime();
 
 		// handle keyboard input
 		processInput(window_);
@@ -298,7 +291,7 @@ void DemoSystem::mainLoop() {
 		glfwSwapBuffers(window_);
 		glfwPollEvents();
 
-		float time_end = glfwGetTime();
+		float time_end = (float)glfwGetTime();
 		float time_elapse = time_end - time_start;
 		if (time_elapse > loop_duration_) {
 			// if 3 consecutive frames are slow and VERBOSE, print message
@@ -307,7 +300,7 @@ void DemoSystem::mainLoop() {
 			last_frame_slow = true;
 		}
 		else {
-			Sleep((loop_duration_ - time_elapse) * 1000);
+			Sleep((unsigned long)(loop_duration_ - time_elapse) * 1000);
 			last_frame_slow = false;
 		}
 		second_last_frame_slow = last_frame_slow;
@@ -415,6 +408,7 @@ void DemoSystem::updateViewpoint(Shader *shader) {
 	shader->setMat4("view", view);
 }
 
+// reference: learnopengl tutorial
 uint DemoSystem::loadTexture(char const * path) {
 	unsigned int textureID;
 	glGenTextures(1, &textureID);
@@ -449,7 +443,6 @@ uint DemoSystem::loadTexture(char const * path) {
 	return textureID;
 }
 
-// process all input: query glfw whether relevant keys are pressed/released this frame and react accordingly
 void DemoSystem::processInput(GLFWwindow *window) {
 	if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
 		glfwSetWindowShouldClose(window, true);
@@ -471,20 +464,20 @@ void DemoSystem::framebufferSizeCallback(int width, int height) {
 
 void DemoSystem::mouseCallback(double pos_x, double pos_y) {
 	if (first_mouse_) {
-		last_mouse_x_ = pos_x;
-		last_mouse_y_ = pos_y;
+		last_mouse_x_ = (float)pos_x;
+		last_mouse_y_ = (float)pos_y;
 		first_mouse_ = false;
 	}
 
-	float xoffset = pos_x - last_mouse_x_;
+	float xoffset = (float)(pos_x - last_mouse_x_);
 	// reversed since y-coordinates go from bottom to top
-	float yoffset = last_mouse_y_ - pos_y;
-	last_mouse_x_ = pos_x;
-	last_mouse_y_ = pos_y;
+	float yoffset = (float)(last_mouse_y_ - pos_y);
+	last_mouse_x_ = (float)pos_x;
+	last_mouse_y_ = (float)pos_y;
 
 	camera_->processMouseMovement(xoffset, yoffset);
 }
 
 void DemoSystem::scrollCallback(double xoffset, double yoffset) {
-	camera_->processMouseScroll(yoffset);
+	camera_->processMouseScroll((float)yoffset);
 }

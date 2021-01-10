@@ -1,135 +1,71 @@
-# 文档
+# 实验报告
 
 2017013599 软件71 从业臻
 
-### 一、运行环境
+### 
 
-操作系统：Windows 10
+### 算法说明
 
-IDE：Visual Studio 2017
+碰撞检测可以分为broad-phase和narrow-phase。broad-phase的作用是消耗较少的时间来排除一些显然的不可能碰撞的物体对。
 
-CUDA版本：10.1
+broad-phase的思路就是将空间划分为小块，对于特殊设计的块来说，位于一个块中的物体，有可能与其发生碰撞的物体一定在某些块中。对于球体来说，narrow-phase可以就是遍历所有球体，将其与所有“有可能”发生碰撞的球体一一计算球心间距离，如果小于两球半径之和则发生碰撞。这里不讨论发生碰撞后的处理方法，主要讨论broad-phase的思路。
 
-依赖的库与文件包括：
+首先，如果省去broad-phase，那么复杂度显然是$O(n^2)$；如果我们将空间均匀划分成块，看作是一个三维数组，并且假设一个块内最多容纳常数个物体，那么每个物体只需要与其他最多$C$个物体比较，和$n$无关！
 
-- glad和GLFW（通过nupengl.core和nupengl.core.redist）
-- stb_image.h（用于纹理加载）
-- glm数学运算库
-- NVIDIA GPU Computing Toolkit
-- CUDA samples里的一些文件（`...\CUDA Samples\v10.1\common`）
+对于本次大作业的任务，完全不需要使用复杂八叉树结构，只需要将空间均匀划分。设定一个块的大小刚好完整的容纳一个最大的球体（块的边长等于最大的球体直径），那么两球若要相撞，其必然在同一个或者相邻的块中（包括斜对角相邻）。在合适的碰撞更新公式下，基本可以认为不会出现很多球体重叠在同一位置的情况。
 
-#### 环境配置
+然而，怎么找到这至多$C$个物体才决定了复杂度的大小。若将空间看成一个个块，可以给每个物体根据其所处块的位置计算一个哈希值，再根据哈希值排序，以排序后的索引为依据寻找处于同一块（或者近邻块）的物体。最简单的哈希函数就是$z\times HASH\_BLOCK^2+y\times HASH\_BLOCK + x$，其中$x,y,z$是所处块分别在三个维度上的序数，$HASH\_BLOCK$是一个预设的$2$的指数。实际实现中，令$HASH\_BLOCK=64$比较合适，因为$64^3>2\times 20^6$，足以为每个块赋予一个唯一的哈希值，并且内存开销也可以接受。在此思路下，将算法拆解为如下步骤：
 
-使用Visual Studio 2017打开工程文件`CollisionDetection.sln`。
+- 为每个物体计算哈希值（$O(n)$）
+- 根据哈希值排序（由哈希函数特点，使用基数排序，复杂度$O(n)$）
+- 排序后，哈希值从小到大排列，由一段段连续的相等值构成，我们需要找到这些“相等值”的开始处和结束处，亦即一个块的开始处和结束处
+- 有了上一步的信息，就可以遍历所有物体，对每个物体遍历其所处块+相邻块的物体，检测是否发生碰撞，如有则按照公式计算更新（复杂度$O(n)$）
 
-请确保您的电脑上有10.1版本的CUDA，其他版本（不要太老）应该也可以。
-
-此外，`C/C++->预处理器`中的预处理器定义请加上`WIN32`（如果没有）。
-
-不出意外的话，选择Release x64模式应该可以运行。
-
-如果没有`nupengl.core`，可以通过`工具->NuGet包管理器->管理解决方案的NuGet程序包`来解决。
-
-### 二、文件结构
-
-解决方案目录下的`../common,../includes,../packages`均为依赖，`../common`是安装CUDA时附带的Samples中的一些通用功能文件，其中`../common/inc`加入附加包含目录，`../includes`加入包含目录，`../packages`应是NuGet自动管理。
-
-`../shaderPrograms`中是几个着色器程序，都是基于learnopengl教程网站提供的样例改写；`../resources`则是learnopengl教程网站提供的资源中选取的几张纹理。
-
-进入项目目录：
-
-- `main.cpp`是入口点
-- `glad.c`是为了使glad正常工作必须包含的源文件；
-- `camera.h`是相机类
-- `shader.h`是着色器类，主要用于加载并绑定着色器程序等一系列操作
-- `global.h`里定义了一些常量和一些可以更改的变量
-- `environment.h`里定义了模拟场景时的诸多参数
-- `sphere.h`里定义了几种球的原型，和辅助的类
-- `demoSystem.h/.cpp`里是演示系统（包含渲染系统和单纯性能测试）的实现
-- `physicsEngine.h/.cpp`里是物理引擎（即场景构建，碰撞检测模拟）的实现
-- `hSimulation.h`里是CPU（host）上的碰撞检测算法（包括基于空间划分和暴力）的实现
-- `dSimulation.cuh/.cu`里是GPU（device）上的碰撞检测算法（基于空间划分）的实现，但不包括kernel代码
-- `dSimulationKernel.cu`是碰撞检测算法的CUDA kernel代码
-- `mortonEncode.cuh`里包括了CPU/GPU上的Morton编码实现（用于哈希）
-- `packages.config`等，Visual Studio配置相关文件
-
-### 三、程序逻辑
-
-在上述文件用途简述的基础上，详细阐释程序模块间的逻辑和主要运行流程。
-
-#### 模块之间的逻辑
+综上这个算法实际的复杂度大约是：
 
 
 
-#### 主要运行流程
+### 实验结果
 
-`main.cpp`构造一个`DemoSystem`实例`demo_system`，根据`RENDER_MODE`的值，选择：
+为了保证碰撞比较密集，该实验下设定所有碰撞的恢复系数都是1（弹性碰撞），随机的初始速度足够大、且初始位置足够紧密，保证一开始就会发生碰撞。
 
-- 进入演示动画
-- 开始性能测试
+单次实验测试的是`update`1000次的总时间，以下结果均取三次实验平均值，均是Release x64模式。
 
-对于前者，`demo_system`会初始化`GLFW`窗口，加载纹理、着色器，初始化数据、顶点数组、缓冲等，即准备好渲染部分；然后`demo_system`的成员`physics_engine_`也会初始化，分配好内存、显存，初始化一些必要数据。
+首先，为了检验算法复杂度，列出CPU上串行实现该算法的表现：
 
-之后进入一个循环，主要有这几件事：
+| 球体数量         | 10     | 30     | 100    | 300    | 1000   | 3000   | 10000   | 30000   |
+| ---------------- | ------ | ------ | ------ | ------ | ------ | ------ | ------- | ------- |
+| 1000次update耗时 | 0.0321 | 0.0422 | 0.0848 | 0.2429 | 1.2182 | 5.6606 | 14.8823 | 57.2691 |
 
-- 处理`GLFW`窗口事件，检测输入等
-- `physics_engine_`执行`update`函数，获取所有球体最新的位置，并返回给`demo_system`（如果是GPU模式则要从显存复制到内存）
-- 绘制背景和所有球体
-- 睡眠（使得帧数基本恒定）
+画出取对数后的图（横轴是球数除以10再取对数），整体看比较接近于线性的复杂度。
 
-对于后者，区别是不会涉及到任何的`GLFW`窗口初始化和任何绘制相关的逻辑。程序静默地运行一定次数的`physics_engine_.update`，然后输出消耗的时间。
+![cpufast](C:\Users\13731\Dropbox\My PC (LAPTOP-VJ2F61DB)\Desktop\cpufast.png)
 
-### 四、功能演示
+然后是GPU上并行实现该算法的表现：
+
+| 球体数量         | 10     | 30     | 100    | 300    | 1000   | 3000   | 10000  | 30000  |
+| ---------------- | ------ | ------ | ------ | ------ | ------ | ------ | ------ | ------ |
+| 1000次update耗时 | 0.1872 | 0.1965 | 0.2012 | 0.2201 | 0.2500 | 0.3729 | 0.4995 | 1.0083 |
+
+画出取对数后的图（横轴是球数除以10再取对数），可以看出在大约是两段折线，前一段是球数小于1000，后一段是大于1000，这应该和我电脑CUDA设备（GTX 1050）本身的性质和我设置的`num_threads=256`有一定的关系。前一段线程数较小，增加线程几乎不增加时间开销；但线程数增多后，线程的管理也就更加复杂。
+
+![gpufast](C:\Users\13731\Dropbox\My PC (LAPTOP-VJ2F61DB)\Desktop\gpufast.png)
+
+把两张图放在一起：
+
+![fast](C:\Users\13731\Dropbox\My PC (LAPTOP-VJ2F61DB)\Desktop\fast.png)
+
+很明显，GPU上并行化的程序复杂度的系数比CPU上串行的程序的要小的多。
+
+最后，也列出了暴力算法（$O(n^2)$）的表现：
+
+| 球体数量         | 10     | 30     | 100    | 300    | 1000    | 3000     | 10000 | 30000 |
+| ---------------- | ------ | ------ | ------ | ------ | ------- | -------- | ----- | ----- |
+| 1000次update耗时 | 0.0024 | 0.0196 | 0.2275 | 1.9305 | 21.2365 | 194.4840 | /     | /     |
+
+画出取对数后的曲线（横轴是球数平方除以100再取对数），验证了复杂度。
+
+![brutal](C:\Users\13731\Dropbox\My PC (LAPTOP-VJ2F61DB)\Desktop\brutal.png)
 
 
 
-### 五、参考文献和引用代码出处
-
-#### 参考文献（包括网络资源）：
-
-CUDA安装：https://www.cnblogs.com/arxive/p/11198420.html
-
-OpenGL相关库和包安装：http://fangda.me/2018/03/17/VS2017-%E9%85%8D%E7%BD%AEglut-glew-glfw-glad%E6%9C%80%E7%AE%80%E5%8D%95%E7%9A%84%E6%96%B9%E6%B3%95/
-
-CUDA使用：
-
-- https://docs.nvidia.com/cuda/
-
-- https://developer.nvidia.com/zh-cn/blog
-
-OpenGL使用：（**主要参考**）https://learnopengl-cn.github.io/
-
-空间划分算法：
-
-- （**主要参考**）https://developer.download.nvidia.com/assets/cuda/files/particles.pdf
-- https://developer.nvidia.com/gpugems/gpugems3/part-v-physics-simulation/chapter-32-broad-phase-collision-detection-cuda
-
-球体碰撞后状态更新方式（DEM方法）:
-
-- https://developer.nvidia.com/gpugems/gpugems3/part-v-physics-simulation/chapter-29-real-time-rigid-body-simulation-gpus
-
-DEM方法论文：
-
-- https://max.book118.com/html/2018/0531/169838280.shtm
-
-Morton编码：
-
-- https://john.cs.olemiss.edu/~rhodes/papers/Nocentino10.pdf
-- https://en.wikipedia.org/wiki/Z-order_curve
-
-代码风格（Google）：https://zh-google-styleguide.readthedocs.io/en/latest/
-
-Thrust文档：https://docs.nvidia.com/cuda/thrust/index.html
-
-部分其他（问题解决）：
-
-- CPU的按键排序实现：https://stackoverflow.com/questions/2999135/how-can-i-sort-the-vector-elements-using-members-as-the-key-in-c
-- glm::rotate的使用：https://stackoverflow.com/questions/8844585/glm-rotate-usage-in-opengl
-
-#### 引用代码出处（代码注释中也基本覆盖了）：
-
-算法：安装CUDA后：`...\NVIDIA Corporation\CUDA Samples\v10.1\5_Simulations\particles`下的粒子模拟程序
-
-相机类、着色器类、GLFW窗口初始化、加载纹理、绘制等：（OpenGL教程代码仓库）https://github.com/JoeyDeVries/LearnOpenGL
-
-Morton编码：https://fgiesen.wordpress.com/2009/12/13/decoding-morton-codes/

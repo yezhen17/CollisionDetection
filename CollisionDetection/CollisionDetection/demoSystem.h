@@ -21,8 +21,8 @@ public:
 	DemoSystem(uint sphere_num,
 		bool render_mode,
 		bool gpu_mode,
-		bool use_spotlight = false,
-		bool immersive_mode_ = false,
+		bool use_spotlight = USE_SPOTLIGHT,
+		bool immersive_mode_ = IMMERSIVE_MODE,
 		uint simulation_step = SIMULATION_STEP,
 		uint frame_rate = FRAME_RATE, 
 		glm::vec3 origin = glm::vec3(0.0f, 0.0f, 0.0f),
@@ -100,7 +100,7 @@ protected:
 	// the time elapsed in each step of simulation
 	float simulation_timestep_;
 	// because rendering is slower, update several steps in one rendering loop
-	float simulation_step_;
+	uint simulation_step_;
 
 	// room origin and size for simulation
 	glm::vec3 origin_;

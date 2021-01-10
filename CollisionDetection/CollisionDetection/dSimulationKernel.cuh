@@ -1,5 +1,6 @@
 /*
  * This file provides the kernel code for the collision detection algorithm based on spatial subdivision
+ * reference: CUDA 10.1 samples (particles)
  */
 
 #ifndef DSIMULATIONKERNEL_CUH
@@ -16,8 +17,8 @@
 #define GET_INDEX __mul24(blockIdx.x,blockDim.x) + threadIdx.x
 
  /******* Constant GPU Memory *******/
-__constant__ SimulationEnv d_env; // Environment parameters
-__constant__ SimulationSphereProto d_protos; // Sphere parameters (fixed throughout simulation)
+__constant__ SimulationEnv d_env; // Environment parameters (fixed throughout simulation)
+__constant__ SimulationSphereProto d_protos; // Sphere prototypes
 __constant__ int3 neighboorhood_3[27] = {
 	-1, -1, -1,
 	 0, -1, -1,
@@ -48,7 +49,6 @@ __constant__ int3 neighboorhood_3[27] = {
 	 1,  1,  1,
 };
 
-// calculate position in uniform grid
 __device__ int3 convertWorldPosToGrid(float3 world_pos) {
 	int3 grid_pos;
 	grid_pos.x = floor(world_pos.x / d_env.cell_size);
@@ -57,20 +57,11 @@ __device__ int3 convertWorldPosToGrid(float3 world_pos) {
 	return grid_pos;
 }
 
-// calculate address in grid from position (clamping to edges)
 __device__ uint hashFunc(int3 grid_pos) {
-	//grid_pos.x = grid_pos.x & (d_env.grid_size.x - 1);  // wrap grid, assumes size is power of 2
-	//grid_pos.y = grid_pos.y & (d_env.grid_size.y - 1);
-	//grid_pos.z = grid_pos.z & (d_env.grid_size.z - 1);
-	//return grid_pos.x + (grid_pos.y << d_env.grid_exp.x) + (grid_pos.z << (d_env.grid_exp.x + d_env.grid_exp.y));
-
 	// use morton encoding for more coherent memory access
 	return dMortonEncode3D(grid_pos);
-
-	// return __umul24(__umul24(gridPos.z, d_env.grid_size.y), d_env.grid_size.x) + __umul24(gridPos.y, d_env.grid_size.x) + gridPos.x;
 }
 
-// calculate grid hash value for each particle
 __global__ void hashifyKernel(
 	uint *hashes,
 	uint *indices_to_sort,
@@ -82,13 +73,10 @@ __global__ void hashifyKernel(
 	int3 grid_pos = convertWorldPosToGrid(pos[index]);
 	uint hash = hashFunc(grid_pos);
 
-	// store grid hash and particle index
 	hashes[index] = hash;
 	indices_to_sort[index] = index;
 }
 
-// rearrange particle data into sorted order, and find the start of each cell
-// in the sorted hash array
 __global__ void collectCellsKernel(
 	uint *cell_start,  
 	uint *cell_end,   
@@ -109,7 +97,6 @@ __global__ void collectCellsKernel(
 	}
 }
 
-// TODO
 // Use the DEM method adapted to various masses and restitudes
 __device__ float3 collisionAtomic(
 	float3 pos_c,
@@ -177,7 +164,6 @@ __global__ void collisionKernel(
 	uint index = GET_INDEX;
 	if (index >= d_env.sphere_num) return;
 
-	// Now use the sorted index to reorder the pos and vel data
 	uint index_origin_c = indices_sorted[index];
 	float3 pos_c = pos_s[index_origin_c];
 	float3 velo_c = velo_s[index_origin_c];
@@ -185,21 +171,15 @@ __global__ void collisionKernel(
 	float radius_c = d_protos.radii[type_c];
 	float mass_c = d_protos.masses[type_c];
 
-	// get address in grid
 	int3 grid_pos_c = convertWorldPosToGrid(pos_c);
-
-	// examine neighbouring cells
 	float3 force = make_float3(0.0f);
 
 	// need not deal with out-of-boundary neighbors because of hashing
 	for (uint i = 0; i < 27; ++i) {
 		uint hash = hashFunc(grid_pos_c + neighboorhood_3[i]);
-
-		// get start of bucket for this cell
 		uint index_cell_start = cell_start[hash];
 
 		if (index_cell_start != 0xffffffff) {
-			// iterate over particles in this cell
 			uint index_cell_end = cell_end[hash];
 			for (uint j = index_cell_start; j < index_cell_end; ++j) {
 				uint index_origin_n = indices_sorted[j];
@@ -208,8 +188,6 @@ __global__ void collisionKernel(
 					float3 pos_n = pos_s[index_origin_n];
 					float3 vel_n = velo_s[index_origin_n];
 					uint type_n = types[index_origin_n];
-					
-					// collide two spheres
 					force += collisionAtomic(pos_c, pos_n, velo_c, vel_n, radius_c, mass_c, type_c, type_n);
 				}
 			}
@@ -234,7 +212,6 @@ __global__ void updateDynamicsKernel(
 	float3 accel = accel_s[index];
 	uint type = types[index];
 	float radius = d_protos.radii[type];
-	float mass = d_protos.masses[type];
 	float restitution = -d_protos.restitution[type][type];
 	float3 max_corner = d_env.max_corner;
 	float3 min_corner = d_env.min_corner;

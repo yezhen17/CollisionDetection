@@ -124,9 +124,9 @@ void PhysicsEngine::initEnvironment() {
 	// environment parameters 
 	env_.drag = DRAG;
 	env_.gravity = make_float3(0.0f, -GRAVITY, 0.0f);
-	env_.stiffness = STIFFNESS * min_mass;
-	env_.damping = DAMPING * min_mass;
-	env_.friction = FRICTION * min_mass;
+	env_.stiffness = STIFFNESS; // *min_mass;
+	env_.damping = DAMPING; // *min_mass;
+	env_.friction = FRICTION; // *min_mass;
 }
 
 void PhysicsEngine::initSpheres() {
@@ -135,7 +135,7 @@ void PhysicsEngine::initSpheres() {
 	if (init_mode_ == SPREAD_MODE || init_mode_ == CUBE_MODE) {
 		float half_cell_size = cell_size_ * 0.5f;
 		float jitter_magnitude = half_cell_size * 0.02f;
-		float velo_magnitude = half_cell_size * 0.02f;
+		float velo_magnitude = half_cell_size * 0.1f;
 		uint x_num, y_num, z_num;
 		
 		// spread mode means that: starting from the top
