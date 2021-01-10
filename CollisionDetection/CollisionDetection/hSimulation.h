@@ -11,7 +11,6 @@
 
 #include "global.h"
 #include "environment.h"
-#include "sphere.h"
 #include "mortonEncode.cuh"
 
 SimulationEnv *h_env; // Environment parameters
@@ -56,7 +55,6 @@ int3 hConvertWorldPosToGrid(float3 world_pos) {
 	return grid_pos;
 }
 
-// calculate address in grid from position (clamping to edges)
 uint hHashFunc(int3 grid_pos) {
 	return hMortonEncode3D(grid_pos);
 	//grid_pos.x = grid_pos.x & (h_env->grid_size.x - 1);  // wrap grid, assumes size is power of 2
@@ -98,9 +96,9 @@ void hHashifyAndSort(
 }
 
 void hCollectCells(
-	uint   *cell_start,
-	uint   *cell_end,
-	uint   *hashes) {
+	uint *cell_start,
+	uint *cell_end,
+	uint *hashes) {
 	memset(cell_start, (unsigned char)0xff, h_env->max_hash_value * sizeof(uint));
 	for (uint i = 0; i < h_env->sphere_num; ++i) {
 		uint hash = hashes[i];
@@ -124,11 +122,13 @@ float3 hCollisionAtomic(
 	float3 velo_c,
 	float3 velo_n,
 	float radius_c,
-	float radius_n,
 	float mass_c,
-	float mass_n) {
-	float3 displacement = pos_n - pos_c;
+	uint type_c,
+	uint type_n) {
+	float radius_n = h_protos->radii[type_n];
+	float mass_n = h_protos->masses[type_n];
 
+	float3 displacement = pos_n - pos_c;
 	float distance = length(displacement);
 	float radius_sum = radius_c + radius_n;
 
@@ -137,25 +137,35 @@ float3 hCollisionAtomic(
 	if (distance < radius_sum) {
 		float3 normal = displacement / distance;
 
-		// relative velocity
+		// relative velocity (neighbor relative to center)
 		float3 velo_relative = velo_n - velo_c;
 
+		// relative normal velocity 
 		float3 velo_normal = (dot(velo_relative, normal) * normal);
 
 		// relative tangential velocity
 		float3 velo_tangent = velo_relative - velo_normal;
 
-		// stiffness force
+		// deformation
 		float deform = radius_sum - distance;
 		if (deform > radius_c * 2) {
 			deform = radius_c * 2;
 		}
-		force = -(h_env->stiffness * deform) * normal;
 
-		// tangential friction force
-		force += h_env->friction*velo_tangent;
+		// spring force (linear spring model)
+		force -= (h_env->stiffness * deform) * normal;
 
-		force += h_env->damping * velo_normal;
+		// damping force (dashpot model)
+		// in some models the direction is relative normal direction; 
+		// in others the direction is relative direction
+		// += because the relative velocity is neighbor w.r.t. center
+		float damping = h_protos->damping[type_c][type_n];
+		float mass_sqrt = sqrtf(mass_c*mass_n / (mass_c + mass_n));
+		force += (h_env->damping * damping * mass_sqrt) * velo_normal;
+
+		// tangential friction force (optional, defaults to zero)
+		float force_normal = -dot(force, normal);
+		force += (h_env->friction * force_normal) * velo_tangent;
 
 		//float3 impulse = velo_relative * (1.0f + d_env.e) * 0.5f;
 		//force = dot(impulse, normal) * normal;
@@ -165,13 +175,13 @@ float3 hCollisionAtomic(
 }
 
 void hNarrowPhaseCollisionDetection(
-	float3 *velo_delta_s,               // output: new velocity
-	float3 *pos_s,               // input: sorted positions
-	float3 *velo_s,               // input: sorted velocities
+	float3 *velo_delta_s, 
+	float3 *pos_s,  
+	float3 *velo_s, 
 	uint *types,
-	uint   *indices_sorted,    // input: sorted particle indices_sorted
-	uint   *cell_start,
-	uint   *cell_end) {
+	uint *indices_sorted,  
+	uint *cell_start,
+	uint *cell_end) {
 	for (uint i = 0; i < h_env->sphere_num; ++i) {
 		// Now use the sorted index to reorder the pos and vel data
 		uint index_origin_c = indices_sorted[i];
@@ -204,9 +214,7 @@ void hNarrowPhaseCollisionDetection(
 						float3 pos_n = pos_s[index_origin_n];
 						float3 vel_n = velo_s[index_origin_n];
 						uint type_n = types[index_origin_n];
-						float radius_n = h_protos->radii[type_n];
-						float mass_n = h_protos->masses[type_n];
-						force += hCollisionAtomic(pos_c, pos_n, velo_c, vel_n, radius_c, radius_n, mass_c, mass_n);
+						force += hCollisionAtomic(pos_c, pos_n, velo_c, vel_n, radius_c, mass_c, type_c, type_n);
 					}
 				}
 			}
@@ -237,38 +245,41 @@ void hUpdateDynamics(
 		// new position = old position + velocity * deltaTime
 		pos += velo * elapse;
 
+		float restitution = -h_protos->restitution[type][type];
 		float3 max_corner = h_env->max_corner;
 		float3 min_corner = h_env->min_corner;
 		if (pos.x > max_corner.x - radius) {
 			pos.x = max_corner.x - radius;
-			velo.x *= h_env->boundary_damping;
+			velo.x *= restitution;
 		}
 		if (pos.x < min_corner.x + radius) {
 			pos.x = min_corner.x + radius;
-			velo.x *= h_env->boundary_damping;
+			velo.x *= restitution;
 		}
 		if (pos.y > max_corner.y - radius) {
 			pos.y = max_corner.y - radius;
-			velo.y *= h_env->boundary_damping;
+			velo.y *= restitution;
 		}
 		if (pos.y < min_corner.y + radius) {
 			pos.y = min_corner.y + radius;
-			velo.y *= h_env->boundary_damping;
+			velo.y *= restitution;
 		}
 		if (pos.z > max_corner.z - radius) {
 			pos.z = max_corner.z - radius;
-			velo.z *= h_env->boundary_damping;
+			velo.z *= restitution;
 		}
 		if (pos.z < min_corner.z + radius) {
 			pos.z = min_corner.z + radius;
-			velo.z *= h_env->boundary_damping;
+			velo.z *= restitution;
 		}
 		pos_s[i] = pos;
 		velo_s[i] = velo;
 	}
 }
 
-void hSimulateFast(float *pos_s,
+// fast collision detection algorithm based on space subdivision
+void hSimulateFast(
+	float *pos_s,
 	float *velo_s,
 	float *velo_delta_s,
 	uint *types,
@@ -305,7 +316,8 @@ void hSimulateFast(float *pos_s,
 }
 
 // brutal force collision detection
-void hSimulateBrutal(float *pos_s,
+void hSimulateBrutal(
+	float *pos_s,
 	float *velo_s,
 	float *velo_delta_s,
 	uint *types,

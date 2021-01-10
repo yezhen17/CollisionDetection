@@ -350,22 +350,24 @@ void DemoSystem::renderSpheres() {
 	uint *type = engine_->getSphereType();
 
 	glBindVertexArray(sphere_VAO_);
-	for (uint i = 0; i < sphere_num_; ++i) {
-		// calculate the model matrix for each sphere
-		glm::mat4 model = glm::mat4(1.0f);
-		uint i_x3 = i * 3;
-		model = glm::translate(model, glm::vec3(updated_pos[i_x3], updated_pos[i_x3 + 1], updated_pos[i_x3 + 2]));
-		sphere_shader_->setMat4("model", model);
-
+	for (uint j = 0; j < PROTOTYPE_NUM; ++j) {
 		// set shader attributes according to the sphere type (material and radius)
-		Sphere proto = PROTOTYPES[type[i]];
+		Sphere proto = PROTOTYPES[j];
 		sphere_shader_->setFloat("radius", proto.radius);
 		sphere_shader_->setFloat("material.shininess", proto.shininess);
 		sphere_shader_->setVec3("material.ambient", proto.ambient);
 		sphere_shader_->setVec3("material.diffuse", proto.diffuse);
 		sphere_shader_->setVec3("material.specular", proto.specular);
 
-		glDrawElements(GL_TRIANGLE_STRIP, sphere_index_count_, GL_UNSIGNED_INT, 0);
+		for (uint i = 0; i < sphere_num_; ++i) {
+			if (type[i] != j) continue;
+			// calculate the model matrix for each sphere
+			glm::mat4 model = glm::mat4(1.0f);
+			uint i_x3 = i * 3;
+			model = glm::translate(model, glm::vec3(updated_pos[i_x3], updated_pos[i_x3 + 1], updated_pos[i_x3 + 2]));
+			sphere_shader_->setMat4("model", model);
+			glDrawElements(GL_TRIANGLE_STRIP, sphere_index_count_, GL_UNSIGNED_INT, 0);
+		}
 	}
 }
 

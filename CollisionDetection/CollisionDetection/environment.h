@@ -9,9 +9,8 @@
 
 typedef unsigned int uint;
 
-
 // simulation environment
-struct SimulationEnv {
+typedef struct SimulationEnv {
 	uint sphere_num;
 	float cell_size;
 	uint max_hash_value;
@@ -23,10 +22,18 @@ struct SimulationEnv {
 	// physical environment
 	float3 gravity; 
 	float drag; // global velocity decay factor
-	float stiffness;
-	float damping;
-	float friction;
-	float boundary_damping;
-};
+	float stiffness; // assume stiffness is universal
+	float damping; // damping factor
+	float friction; // assume friction is universal
+
+} SimulationEnv;
+
+// sphere prototypes for getting radius, mass, damping and restitution 
+typedef struct SimulationSphereProto {
+	float radii[4];
+	float masses[4];
+	float damping[4][4];
+	float restitution[4][4];
+} SimulationSphereProto;
 
 #endif

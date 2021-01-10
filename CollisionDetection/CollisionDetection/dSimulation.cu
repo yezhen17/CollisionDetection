@@ -2,10 +2,6 @@
  * The implementation of GPU basic functions and simulation functions
  */
 
-#include <cstdlib>
-#include <cstdio>
-#include <string.h>
-
 #include <cuda_runtime.h>
 #include <helper_cuda.h>
 #include <helper_functions.h>
@@ -29,16 +25,16 @@ extern "C" {
         }
     }
 
-    void allocateArray(void **devPtr, uint size) {
-        checkCudaErrors(cudaMalloc(devPtr, size));
+    void allocateArray(void **dev_ptr, uint size) {
+        checkCudaErrors(cudaMalloc(dev_ptr, size));
     }
 
-	void zeroizeArray(void *devPtr, uint size) {
-		checkCudaErrors(cudaMemset(devPtr, 0x0, size));
+	void zeroizeArray(void *dev_ptr, uint size) {
+		checkCudaErrors(cudaMemset(dev_ptr, 0x0, size));
 	}
 
-    void freeArray(void *devPtr) {
-        checkCudaErrors(cudaFree(devPtr));
+    void freeArray(void *dev_ptr) {
+        checkCudaErrors(cudaFree(dev_ptr));
     }
 
     void threadSync() {
@@ -53,9 +49,7 @@ extern "C" {
 		checkCudaErrors(cudaMemcpy(host, device, size, cudaMemcpyDeviceToHost));
 	}
 
-    void dSetupSimulation(
-		SimulationEnv *h_env, 
-		SimulationSphereProto *h_protos) {
+    void dSetupSimulation(SimulationEnv *h_env,  SimulationSphereProto *h_protos) {
         // copy parameters to constant memory
         checkCudaErrors(cudaMemcpyToSymbol(d_env, h_env, sizeof(SimulationEnv)));
 		checkCudaErrors(cudaMemcpyToSymbol(d_protos, h_protos, sizeof(SimulationSphereProto)));
@@ -68,15 +62,16 @@ extern "C" {
 		num_threads = min(256, sphere_num);
 		num_blocks = (sphere_num + num_threads - 1) / num_threads;
 
-		// parallelly calculate the hash value of every sphere
+		// first calculate the hash value of every sphere
 		hashifyKernel <<< num_blocks, num_threads >>> (
 			hashes,
 			indices,
 			(float3 *)pos_s);
 
-		getLastCudaError("HashifyKernel execution failed: hashify");
+		getLastCudaError("HashifyKernel execution failed.");
 
 		// use thrust radix sort to sort the hashes
+		// and we get the index mapping
 		thrust::sort_by_key(
 			thrust::device_ptr<uint>(hashes),
 			thrust::device_ptr<uint>(hashes + sphere_num),
@@ -85,15 +80,15 @@ extern "C" {
 		// set all cells to empty
 		checkCudaErrors(cudaMemset(cell_start, 0xffffffff, max_hash_value * sizeof(uint)));
 
-		// parallelly find out all the locations where a cell starts or ends
+		// find out all the locations where a cell starts or ends
 		collectCellsKernel <<< num_blocks, num_threads >>> (
 			cell_start,
 			cell_end,
 			hashes);
 
-		getLastCudaError("CollectCellsKernel execution failed: collectCells");
+		getLastCudaError("CollectCellsKernel execution failed.");
 
-		// execute the kernel
+		// process collision by parallelly traversing every cell
 		collisionKernel <<< num_blocks, num_threads >>> (
 			(float3 *)velo_delta_s,
 			(float3 *)pos_s,
@@ -103,18 +98,19 @@ extern "C" {
 			cell_start,
 			cell_end);
 
-		// check if kernel invocation generated an error
-		getLastCudaError("CollisionKernel execution failed");
+		getLastCudaError("CollisionKernel execution failed.");
 
-		// parallelly update the position and velocity of each sphere
+		// update the position and velocity of each sphere
 		updateDynamicsKernel <<<  num_blocks, num_threads >>> (
 			(float3 *)pos_s,
 			(float3 *)velo_s,
 			(float3 *)velo_delta_s,
 			types,
-			elapse);
+			elapse,
+			indices,
+			cell_start,
+			cell_end);
 
-		getLastCudaError("UpdateDynamicsKernel execution failed");
+		getLastCudaError("UpdateDynamicsKernel execution failed.");
 	}
-
-}   // extern "C"
+}

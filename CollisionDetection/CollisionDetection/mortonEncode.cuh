@@ -11,7 +11,6 @@
 #include <math.h>
 #include <helper_math.h>
 #include <math_constants.h>
-#include <device_launch_parameters.h>
 
 
 // "insert" a 0 bit after each of the 16 low bits of x

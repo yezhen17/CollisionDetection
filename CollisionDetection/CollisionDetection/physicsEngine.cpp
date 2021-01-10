@@ -87,13 +87,25 @@ void PhysicsEngine::initEnvironment() {
 	env_.max_hash_value = max_hash_value_;
 
 	float max_radius = 0.0f;
-	for (int i = 0; i < PROTOTYPE_NUM; ++i) {
+	for (uint i = 0; i < PROTOTYPE_NUM; ++i) {
 		Sphere prototype = PROTOTYPES[i];
 		if (prototype.radius > max_radius) {
 			max_radius = prototype.radius;
 		}
 		protos_.masses[i] = prototype.mass;
 		protos_.radii[i] = prototype.radius;
+		for (uint j = 0; j < PROTOTYPE_NUM; ++j) {
+			float rest = RESTITUTION[i][j];
+			float ln_rest = logf(rest);
+			float denom = sqrtf(ln_rest * ln_rest + PI * PI);
+			float numer = 2 * ln_rest;
+			protos_.damping[i][j] = -numer / denom;
+			protos_.restitution[i][j] = rest;
+			// std::cout << -numer / denom << std::endl;
+		}
+	}
+	if (sphere_num_ > 4096) {
+		max_radius = PROTOTYPES[3].radius;
 	}
 
 	// cell size is equal to the maximum sphere radius * 2
@@ -104,18 +116,12 @@ void PhysicsEngine::initEnvironment() {
 	env_.min_corner = make_float3(origin_.x, origin_.y, origin_.z);
 	env_.max_corner = env_.min_corner + make_float3(room_size_.x, room_size_.y, room_size_.z);
 
-	float drag = 1.0f;
-	float gravity = 0.1f;//0.05f;
-	float stiffness = 5.0f;//2.5f;
-	float damping = 0.0f; // 0.1f
-	float friction = 0.0f;
-	float boundary_damping = -0.5f;
-	env_.drag = drag;
-	env_.gravity = make_float3(0.0f, -gravity, 0.0f);
-	env_.stiffness = stiffness;
-	env_.damping = damping;
-	env_.boundary_damping = boundary_damping;
-	env_.friction = friction;
+	// environment parameters 
+	env_.drag = DRAG;
+	env_.gravity = make_float3(0.0f, -GRAVITY, 0.0f);
+	env_.stiffness = STIFFNESS;
+	env_.damping = DAMPING;
+	env_.friction = FRICTION;
 }
 
 void PhysicsEngine::initSpheres() {
@@ -153,8 +159,13 @@ void PhysicsEngine::initSpheres() {
 						h_velo_[index * 3] = genJitter(velo_magnitude);
 						h_velo_[index * 3 + 1] = genJitter(velo_magnitude);
 						h_velo_[index * 3 + 2] = genJitter(velo_magnitude);
-						uint proto_id = rand() % PROTOTYPE_NUM;
-						h_type_[index] = proto_id;
+						if (sphere_num_ > 4096) {
+							h_type_[index] = 3;
+						}
+						else {
+							uint proto_id = rand() % PROTOTYPE_NUM;
+							h_type_[index] = proto_id;
+						}
 					}
 				}
 			}
@@ -238,36 +249,6 @@ void PhysicsEngine::update(float elapse) {
 			elapse,
 			sphere_num_,
 			max_hash_value_);
-		/*dHashifyAndSort(
-			d_hash_,
-			d_index_sorted_,
-			d_pos_,
-			sphere_num_);
-
-		dCollectCells(
-			d_cell_start_,
-			d_cell_end_,
-			d_hash_,
-			sphere_num_,
-			max_hash_value_);
-
-		dNarrowPhaseCollisionDetection(
-			d_velo_delta_,
-			d_pos_,
-			d_velo_,
-			d_type_,
-			d_index_sorted_,
-			d_cell_start_,
-			d_cell_end_,
-			sphere_num_);
-
-		dUpdateDynamics(
-			d_pos_,
-			d_velo_,
-			d_velo_delta_,
-			d_type_,
-			elapse,
-			sphere_num_);*/
 	}
 	else {
 		if (brutal_mode_) {

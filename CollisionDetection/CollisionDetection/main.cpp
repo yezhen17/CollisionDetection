@@ -15,6 +15,8 @@ int main(int argc, char **argv) {
 	uint sphere_num = SPHERE_NUM_DEFAULT;
 	bool render_mode = RENDER_MODE_DEFAULT;
 	bool gpu_mode = GPU_MODE_DEFAULT;
+
+#if false // for debugging
 	char input;
 	bool skip = false;
 	std::cout << "Use default setting? Press [y] to use and any other key elsewise." << std::endl;
@@ -48,7 +50,7 @@ int main(int argc, char **argv) {
 		std::cout << "How many spheres would you want? Enter a number please." << std::endl;
 		uint num;
 		std::cin >> num;
-		if (num > 0 && num < 20000) {
+		if (num >= 0 && num < 32769) {
 			std::cout << "Valid number." << std::endl;
 			sphere_num = num;
 		}
@@ -56,7 +58,9 @@ int main(int argc, char **argv) {
 			std::cout << "Invalid number! Exiting..." << std::endl;
 		}
 	}
-	if (GPU_MODE_DEFAULT) {
+#endif
+
+	if (gpu_mode) {
 		cudaInit(argc, argv);
 	}
 	std::cout << "************************************" << std::endl;

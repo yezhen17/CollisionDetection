@@ -10,16 +10,18 @@ typedef unsigned int uint;
 // cannot be changed by user
 // ---------------------------------------------------------------------------------------
 
+const float PI = 3.141592653f;
+const float E = 2.718281828f;
+
 const uint HASH_BLOCK = 64; // fix this since 64 is suitable for this task
-const float PI = 3.14159265359f;
-const uint PROTOTYPE_NUM = 7;  // maximum 7 prototypes
+const uint PROTOTYPE_NUM = 4;  // maximum 4 prototypes
 
 const float MOUSE_SPEED = 5.0f;
 const float ZOOM_DEFAULT = 20.0f;
 
 // determines how "round" the sphere is: the larger, the rounder
-const uint HORIZONTAL_FRAGMENT_NUM = 16;
-const uint VERTICAL_FRAGMENT_NUM = 16;
+const uint HORIZONTAL_FRAGMENT_NUM = 12;
+const uint VERTICAL_FRAGMENT_NUM = 12;
 
 const uint WINDOW_WIDTH = 800;
 const uint WINDOW_HEIGHT = 800;
@@ -30,12 +32,19 @@ const bool VERBOSE = true;
 
 const bool BRUTAL_MODE = false;
 
+// environment related
+const float DRAG = 0.999f;
+const float GRAVITY = 0.1f;//0.05f;
+const float STIFFNESS = 5.0f;//2.5f;
+const float DAMPING = 0.5f; // 0.2f
+const float FRICTION = 0.0f;
+
 // ---------------------------------------------------------------------------------------
 
 // can be modified by user
 // ---------------------------------------------------------------------------------------
 
-const uint SPHERE_NUM_DEFAULT = 10;
+const uint SPHERE_NUM_DEFAULT = 8000;
 
 const bool RENDER_MODE_DEFAULT = true;
 const bool GPU_MODE_DEFAULT = true;

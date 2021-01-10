@@ -84,10 +84,23 @@ public:
 	// processes input received from a mouse scroll-wheel event. Only requires input on the vertical wheel-axis
 	void processMouseScroll(float offset) {
 		zoom_ -= (float)offset;
-		if (zoom_ < 1.0f)
-			zoom_ = 1.0f;
+		if (zoom_ < 5.0f)
+			zoom_ = 5.0f;
 		if (zoom_ > 30.0f)
 			zoom_ = 30.0f;
+	}
+
+protected:
+	// calculates the front vector from the Camera's (updated) Euler Angles
+	void updateCameraVectors() {
+		glm::vec3 front;
+		front.x = cos(glm::radians(yaw_)) * cos(glm::radians(pitch_));
+		front.y = sin(glm::radians(pitch_));
+		front.z = sin(glm::radians(yaw_)) * cos(glm::radians(pitch_));
+		camera_front_ = glm::normalize(front);
+		camera_pos_ = -camera_front_ * distance_ + origin_;
+		camera_right_ = glm::normalize(glm::cross(camera_front_, world_up_));
+		camera_up_ = glm::normalize(glm::cross(camera_right_, camera_front_));
 	}
 
 protected:
@@ -110,19 +123,6 @@ protected:
 	// camera options
 	float view_shift_speed_;
 	float zoom_;
-
-protected:
-	// calculates the front vector from the Camera's (updated) Euler Angles
-	void updateCameraVectors() {
-		glm::vec3 front;
-		front.x = cos(glm::radians(yaw_)) * cos(glm::radians(pitch_));
-		front.y = sin(glm::radians(pitch_));
-		front.z = sin(glm::radians(yaw_)) * cos(glm::radians(pitch_));
-		camera_front_ = glm::normalize(front);
-		camera_pos_ = -camera_front_ * distance_ + origin_;
-		camera_right_ = glm::normalize(glm::cross(camera_front_, world_up_));
-		camera_up_ = glm::normalize(glm::cross(camera_right_, camera_front_));
-	}
 };
 
 #endif
