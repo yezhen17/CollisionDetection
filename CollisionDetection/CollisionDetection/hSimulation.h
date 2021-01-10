@@ -74,15 +74,14 @@ void hHashifyAndSort(
 	float3 *pos) {
 	std::vector<std::pair<uint, uint>> hashes_and_indices;
 	for (uint i = 0; i < h_env->sphere_num; ++i) {
-		float3 world_pos = pos[i];
-		int3 grid_pos = hConvertWorldPosToGrid(world_pos);
-
+		int3 grid_pos = hConvertWorldPosToGrid(pos[i]);
 		uint hash = hHashFunc(grid_pos);
 
 		// store grid hash and particle index
-
 		hashes_and_indices.push_back(std::make_pair(hash, i));
 	}
+
+	// sort and then reassign
 	std::stable_sort(hashes_and_indices.begin(), hashes_and_indices.end(),
 		[](std::pair<uint, uint> const &a, std::pair<uint, uint> const &b) {
 		return a.first < b.first;
@@ -161,21 +160,18 @@ float3 hCollisionAtomic(
 		// += because the relative velocity is neighbor w.r.t. center
 		float damping = h_protos->damping[type_c][type_n];
 		float mass_sqrt = sqrtf(mass_c*mass_n / (mass_c + mass_n));
-		force += (h_env->damping * damping * mass_sqrt) * velo_normal;
+		force += (h_env->damping * damping * mass_sqrt) * velo_relative;
 
 		// tangential friction force (optional, defaults to zero)
 		float force_normal = -dot(force, normal);
 		force += (h_env->friction * force_normal) * velo_tangent;
-
-		//float3 impulse = velo_relative * (1.0f + d_env.e) * 0.5f;
-		//force = dot(impulse, normal) * normal;
 	}
 
 	return force;
 }
 
 void hNarrowPhaseCollisionDetection(
-	float3 *velo_delta_s, 
+	float3 *accel_s, 
 	float3 *pos_s,  
 	float3 *velo_s, 
 	uint *types,
@@ -221,30 +217,31 @@ void hNarrowPhaseCollisionDetection(
 		}
 
 		// write velocity change
-		velo_delta_s[index_origin_c] = force / mass_c;
+		accel_s[index_origin_c] = force / mass_c;
 	}
 }
 
 void hUpdateDynamics(
 	float3 *pos_s,
 	float3 *velo_s,
-	float3 *velo_delta_s,
+	float3 *accel_s,
 	uint *types,
 	float elapse) {
 	for (uint i = 0; i < h_env->sphere_num; ++i) {
 		float3 pos = pos_s[i];
 		float3 velo = velo_s[i];
-		float3 velo_delta = velo_delta_s[i];
+		float3 accel = accel_s[i];
 		uint type = types[i];
 		float radius = h_protos->radii[type];
 
-		velo += velo_delta;
+		velo += accel * elapse;
 		velo += h_env->gravity * elapse;
 		velo *= h_env->drag;
 
 		// new position = old position + velocity * deltaTime
 		pos += velo * elapse;
 
+		// collide with boundaries (directly use restitution)
 		float restitution = -h_protos->restitution[type][type];
 		float3 max_corner = h_env->max_corner;
 		float3 min_corner = h_env->min_corner;
@@ -319,12 +316,12 @@ void hSimulateFast(
 void hSimulateBrutal(
 	float *pos_s,
 	float *velo_s,
-	float *velo_delta_s,
+	float *accel_s,
 	uint *types,
 	float elapse) {
 	float3 *pos_s_3 = (float3 *)pos_s;
 	float3 *velo_s_3 = (float3 *)velo_s;
-	float3 *velo_delta_s_3 = (float3 *)velo_delta_s;
+	float3 *accel_s_3 = (float3 *)accel_s;
 	for (uint i = 0; i < h_env->sphere_num; ++i) {
 		float3 force = make_float3(0.0f);
 		float3 pos_c = pos_s_3[i];
@@ -342,9 +339,9 @@ void hSimulateBrutal(
 				force += hCollisionAtomic(pos_c, pos_n, velo_c, velo_n, radius_c, radius_n, mass_c, mass_n);
 			}
 		}
-		velo_delta_s_3[i] = force / mass_c;
+		accel_s_3[i] = force / mass_c;
 	}
-	hUpdateDynamics(pos_s_3, velo_s_3, velo_delta_s_3, types, elapse);
+	hUpdateDynamics(pos_s_3, velo_s_3, accel_s_3, types, elapse);
 }
 
 #endif // !HSIMULATION_H

@@ -11,12 +11,13 @@
 
 #include "demoSystem.h"
 
-DemoSystem::DemoSystem(uint sphere_num, bool render_mode, bool gpu_mode, bool use_spotlight, bool immersive_mode, float simulation_timestep,
-	uint frame_rate, glm::vec3 origin, glm::vec3 room_size):
+DemoSystem::DemoSystem(uint sphere_num, bool render_mode, bool gpu_mode, bool use_spotlight, bool immersive_mode, 
+	uint simulation_step, uint frame_rate, glm::vec3 origin, glm::vec3 room_size):
 	render_mode_(render_mode),
 	use_spotlight_(use_spotlight),
 	immersive_mode_(immersive_mode),
-	simulation_timestep_(simulation_timestep),
+	simulation_timestep_(1.0f / frame_rate),
+	simulation_step_(simulation_step),
 	frame_rate_(frame_rate),
 	loop_duration_(1.0f / frame_rate),
 	sphere_num_(sphere_num),
@@ -345,7 +346,9 @@ void DemoSystem::renderSpheres() {
 	updateViewpoint(sphere_shader_);
 
 	// get updated vertices from engine
-	engine_->update(simulation_timestep_);
+	for (uint i = 0; i < simulation_step_; ++i) {
+		engine_->update(simulation_timestep_);
+	}
 	float* updated_pos = engine_->outputPos();
 	uint *type = engine_->getSphereType();
 

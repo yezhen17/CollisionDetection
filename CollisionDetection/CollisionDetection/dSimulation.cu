@@ -106,10 +106,7 @@ extern "C" {
 			(float3 *)velo_s,
 			(float3 *)velo_delta_s,
 			types,
-			elapse,
-			indices,
-			cell_start,
-			cell_end);
+			elapse);
 
 		getLastCudaError("UpdateDynamicsKernel execution failed.");
 	}

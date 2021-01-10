@@ -70,7 +70,7 @@ protected:
 	// CPU data
 	float *h_pos_; // positions
 	float *h_velo_;  // velocities
-	float *h_velo_delta_; // velocity changes
+	float *h_accel_; // accelerations
 	uint *h_type_; // sphere types
 
 	uint  *h_hash_; // hash values
@@ -81,7 +81,7 @@ protected:
 	// GPU data
 	float *d_pos_;
 	float *d_velo_;
-	float *d_velo_delta_;
+	float *d_accel_;
 	uint *d_type_;
 
 	uint  *d_hash_; 

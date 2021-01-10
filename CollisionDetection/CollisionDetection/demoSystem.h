@@ -18,12 +18,12 @@
 
 class DemoSystem {
 public:
-	DemoSystem(uint sphere_num, 
+	DemoSystem(uint sphere_num,
 		bool render_mode,
 		bool gpu_mode,
-		bool use_spotlight = false, 
-		bool immersive_mode_ = false, 
-		float simulation_timestep = 0.1f,
+		bool use_spotlight = false,
+		bool immersive_mode_ = false,
+		uint simulation_step = SIMULATION_STEP,
 		uint frame_rate = FRAME_RATE, 
 		glm::vec3 origin = glm::vec3(0.0f, 0.0f, 0.0f),
 		glm::vec3 room_size = glm::vec3(1.0f, 1.0f, 1.0f));
@@ -99,6 +99,8 @@ protected:
 
 	// the time elapsed in each step of simulation
 	float simulation_timestep_;
+	// because rendering is slower, update several steps in one rendering loop
+	float simulation_step_;
 
 	// room origin and size for simulation
 	glm::vec3 origin_;

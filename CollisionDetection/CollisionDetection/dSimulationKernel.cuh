@@ -79,9 +79,7 @@ __global__ void hashifyKernel(
 
 	if (index >= d_env.sphere_num) return;
 
-	float3 world_pos = pos[index];
-	int3 grid_pos = convertWorldPosToGrid(world_pos);
-
+	int3 grid_pos = convertWorldPosToGrid(pos[index]);
 	uint hash = hashFunc(grid_pos);
 
 	// store grid hash and particle index
@@ -163,16 +161,13 @@ __device__ float3 collisionAtomic(
 		// tangential friction force (optional, defaults to zero)
 		float force_normal = -dot(force, normal);
 		force += (d_env.friction * force_normal) * velo_tangent;
-
-		//float3 impulse = velo_relative * (1.0f + d_env.e) * 0.5f;
-		//force = dot(impulse, normal) * normal;
 	}
 
 	return force;
 }
 
 __global__ void collisionKernel(
-	float3 *velo_delta_s,     
+	float3 *accel_s,     
 	float3 *pos_s,       
 	float3 *velo_s,     
 	uint *types,
@@ -221,180 +216,65 @@ __global__ void collisionKernel(
 		}
 	}
 
-	
-	//float damping = sqrtf(mass_c) * d_protos.damping[type_c][type_c] * d_env.damping;
-	//// float restitution = -d_protos.restitution[type_c][type_c];
-	//damping = (1.0f + d_protos.restitution[type_c][type_c]) * mass_c;
-	//float stiffness = d_env.stiffness;
-	//float3 max_corner = d_env.max_corner;
-	//float3 min_corner = d_env.min_corner;
-	//if (pos_c.x > max_corner.x - radius_c && velo_c.x > 0) {
-	//	//pos.x = max_corner.x - radius;
-	//	//velo.x *= restitution;
-	//	force.x -= damping * velo_c.x;
-	//	force.x -= stiffness * (pos_c.x - max_corner.x + radius_c);
-
-	//}
-
-	//if (pos_c.x < min_corner.x + radius_c && velo_c.x < 0) {
-	//	//pos.x = min_corner.x + radius;
-	//	//velo.x *= restitution;
-	//	force.x -= damping * velo_c.x;
-	//	force.x -= stiffness * (pos_c.x - min_corner.x - radius_c);
-
-	//}
-
-	//if (pos_c.y > max_corner.y - radius_c && velo_c.y > 0) {
-	//	//pos.y = max_corner.y - radius;
-	//	//velo.y *= restitution;
-	//	force.y -= damping * velo_c.y;
-	//	force.y -= stiffness * (pos_c.y - max_corner.y + radius_c);
-
-	//}
-
-	//if (pos_c.y < min_corner.y + radius_c && velo_c.y < 0) {
-	//	//pos.y = min_corner.y + radius;
-	//	//velo.y *= restitution;
-	//	force.y -= damping * velo_c.y;
-	//	force.y -= stiffness * (pos_c.y - min_corner.y - radius_c);
-
-	//}
-
-	//if (pos_c.z > max_corner.z - radius_c && velo_c.z > 0) {
-	//	//pos.z = max_corner.z - radius;
-	//	//velo.z *= restitution;
-	//	force.z -= damping * velo_c.z;
-	//	force.z -= stiffness * (pos_c.z - max_corner.z + radius_c);
-
-	//}
-
-	//if (pos_c.z < min_corner.z + radius_c && velo_c.z < 0) {
-	//	//pos.z = min_corner.z + radius;
-	//	//velo.z *= restitution;
-	//	force.z -= damping * velo_c.z;
-	//	force.z -= stiffness * (pos_c.z - min_corner.z - radius_c);
-
-	//}
-
 	// write velocity change
-	velo_delta_s[index_origin_c] = force / mass_c;
+	accel_s[index_origin_c] = force / mass_c;
 }
 
 __global__ void updateDynamicsKernel(
 	float3 *pos_s,
 	float3 *velo_s,
-	float3 *velo_delta_s,
+	float3 *accel_s,
 	uint *types,
-	float elapse,
-	uint *indices_sorted,
-	uint *cell_start,
-	uint *cell_end) {
+	float elapse) {
 	uint index = GET_INDEX;
 	if (index >= d_env.sphere_num) return;
 
 	float3 pos = pos_s[index];
 	float3 velo = velo_s[index];
-	float3 velo_delta = velo_delta_s[index];
+	float3 accel = accel_s[index];
 	uint type = types[index];
 	float radius = d_protos.radii[type];
 	float mass = d_protos.masses[type];
+	float restitution = -d_protos.restitution[type][type];
+	float3 max_corner = d_env.max_corner;
+	float3 min_corner = d_env.min_corner;
 
-	velo += velo_delta;
+	velo += accel * elapse;
 	velo += d_env.gravity * elapse;
 	velo *= d_env.drag;
 
 	// new position = old position + velocity * deltaTime
 	pos += velo * elapse;
 
-	float restitution = -d_protos.restitution[type][type];
-	float damping = sqrtf(mass) * d_protos.damping[type][type] * d_env.damping * 4.0f;
-	float stiffness = d_env.stiffness * 3.0f;
-	float3 max_corner = d_env.max_corner;
-	float3 min_corner = d_env.min_corner;
-	if (pos.x > max_corner.x - radius && velo.x > 0) {
+	// collide with boundaries (directly use restitution)
+	if (pos.x > max_corner.x - radius) {
 		pos.x = max_corner.x - radius;
 		velo.x *= restitution;
-		/*velo.x -= damping * velo.x / mass;
-		velo.x -= stiffness * (pos.x - max_corner.x + radius) / mass;*/
-		
 	}
 
-	if (pos.x < min_corner.x + radius && velo.x < 0) {
+	if (pos.x < min_corner.x + radius) {
 		pos.x = min_corner.x + radius;
 		velo.x *= restitution;
-		/*velo.x -= damping * velo.x / mass;
-		velo.x -= stiffness * (pos.x - min_corner.x - radius)  / mass;
-		*/
 	}
 
-	if (pos.y > max_corner.y - radius && velo.y > 0) {
+	if (pos.y > max_corner.y - radius) {
 	    pos.y = max_corner.y - radius;
 		velo.y *= restitution;
-	/*	velo.y -= damping * velo.y / mass;
-		velo.y -= stiffness * (pos.y - max_corner.y + radius) / mass;*/
-		
 	}
 
-	if (pos.y < min_corner.y + radius && velo.y < 0) {
+	if (pos.y < min_corner.y + radius) {
 		pos.y = min_corner.y + radius;
 		velo.y *= restitution;
-		/*velo.y -= damping * velo.y / mass;
-		velo.y -= stiffness * (pos.y - min_corner.y - radius) / mass;*/
-		
 	}
 
-	if (pos.z > max_corner.z - radius && velo.z > 0) {
+	if (pos.z > max_corner.z - radius) {
 		pos.z = max_corner.z - radius;
-		velo.z *= restitution;
-		/*velo.z -= damping * velo.z / mass;
-		velo.z -= stiffness * (pos.z - max_corner.z + radius) / mass;*/
-		
+		velo.z *= restitution;	
 	}
 
-	if (pos.z < min_corner.z + radius && velo.z < 0) {
+	if (pos.z < min_corner.z + radius) {
 		pos.z = min_corner.z + radius;
-		velo.z *= restitution;
-		/*velo.z -= damping * velo.z / mass;
-		velo.z -= stiffness * (pos.z - min_corner.z - radius) / mass;*/
-		
-	}
-
-	uint index_origin_c = indices_sorted[index];
-	// get address in grid
-	int3 grid_pos_c = convertWorldPosToGrid(pos);
-
-	// examine neighbouring cells
-	float3 force = make_float3(0.0f);
-
-	// need not deal with out-of-boundary neighbors because of hashing
-	for (uint i = 0; i < 27; ++i) {
-		uint hash = hashFunc(grid_pos_c + neighboorhood_3[i]);
-
-		// get start of bucket for this cell
-		uint index_cell_start = cell_start[hash];
-
-		if (index_cell_start != 0xffffffff) {
-			// iterate over particles in this cell
-			uint index_cell_end = cell_end[hash];
-			for (uint j = index_cell_start; j < index_cell_end; ++j) {
-				uint index_origin_n = indices_sorted[j];
-				// prevent collision with itself
-				if (index_origin_n != index_origin_c) {
-					float3 pos_n = pos_s[index_origin_n];
-					float3 vel_n = velo_s[index_origin_n];
-					uint type_n = types[index_origin_n];
-					float radius_n = d_protos.radii[type_n];
-					if (pos_n.y > pos.y) {
-						float3 displacement = pos_n - pos;
-						float distance = length(displacement);
-						float radius_sum = radius + radius_n;
-						if (distance < radius_sum) {
-							pos_s[index_origin_n] = pos + displacement / distance * radius_sum;
-						}
-					}
-				}
-			}
-		}
+		velo.z *= restitution;	
 	}
 
 	pos_s[index] = pos;

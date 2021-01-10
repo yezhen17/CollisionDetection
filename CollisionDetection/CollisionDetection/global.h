@@ -27,24 +27,25 @@ const uint WINDOW_WIDTH = 800;
 const uint WINDOW_HEIGHT = 800;
 
 const uint FRAME_RATE = 50;
+const uint SIMULATION_STEP = 5;
 
 const bool VERBOSE = true;
 
 const bool BRUTAL_MODE = false;
 
 // environment related
-const float DRAG = 0.999f;
-const float GRAVITY = 0.1f;//0.05f;
-const float STIFFNESS = 5.0f;//2.5f;
-const float DAMPING = 0.5f; // 0.2f
-const float FRICTION = 0.0f;
+const float DRAG = 0.99999f;
+const float GRAVITY = 0.2f;//0.05f;
+const float STIFFNESS = 1000.0f;//4.0f;
+const float DAMPING = 8.0f; // 0.02f
+const float FRICTION = 0.1f;
 
 // ---------------------------------------------------------------------------------------
 
 // can be modified by user
 // ---------------------------------------------------------------------------------------
 
-const uint SPHERE_NUM_DEFAULT = 8000;
+const uint SPHERE_NUM_DEFAULT = 10000;
 
 const bool RENDER_MODE_DEFAULT = true;
 const bool GPU_MODE_DEFAULT = true;

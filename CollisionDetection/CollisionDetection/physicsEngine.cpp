@@ -47,9 +47,9 @@ void PhysicsEngine::initMemory() {
 		// allocate GPU data
 		allocateArray((void **)&d_pos_, space_3xf);
 		allocateArray((void **)&d_velo_, space_3xf);
-		allocateArray((void **)&d_velo_delta_, space_3xf);
+		allocateArray((void **)&d_accel_, space_3xf);
 		allocateArray((void **)&d_type_, space_1xu);
-		zeroizeArray(d_velo_delta_, space_3xf);
+		zeroizeArray(d_accel_, space_3xf);
 
 		// allocate parameters for middle calculations on GPU
 		allocateArray((void **)&d_hash_, space_1xu);
@@ -66,13 +66,13 @@ void PhysicsEngine::initMemory() {
 	} 
 	else {
 		// allocate parameters for middle calculations in CPU memory
-		h_velo_delta_ = new float[sphere_num_ * 3];
+		h_accel_ = new float[sphere_num_ * 3];
 		h_hash_ = new uint[sphere_num_];
 		h_index_sorted_ = new uint[sphere_num_];
 		h_cell_start_ = new uint[max_hash_value_];
 		h_cell_end_ = new uint[max_hash_value_];
 
-		memset(h_velo_delta_, 0, space_3xf);
+		memset(h_accel_, 0, space_3xf);
 		memset(h_hash_, 0, space_1xf);
 		memset(h_index_sorted_, 0, space_1xf);
 		memset(h_cell_start_, 0, max_hash_value_ * sizeof(uint));
@@ -87,10 +87,14 @@ void PhysicsEngine::initEnvironment() {
 	env_.max_hash_value = max_hash_value_;
 
 	float max_radius = 0.0f;
+	float min_mass = 999.9f;
 	for (uint i = 0; i < PROTOTYPE_NUM; ++i) {
 		Sphere prototype = PROTOTYPES[i];
 		if (prototype.radius > max_radius) {
 			max_radius = prototype.radius;
+		}
+		if (prototype.mass < min_mass) {
+			min_mass = prototype.mass;
 		}
 		protos_.masses[i] = prototype.mass;
 		protos_.radii[i] = prototype.radius;
@@ -101,11 +105,12 @@ void PhysicsEngine::initEnvironment() {
 			float numer = 2 * ln_rest;
 			protos_.damping[i][j] = -numer / denom;
 			protos_.restitution[i][j] = rest;
-			// std::cout << -numer / denom << std::endl;
+			// std::cout << rest << ", " << -numer / denom << std::endl;
 		}
 	}
 	if (sphere_num_ > 4096) {
 		max_radius = PROTOTYPES[3].radius;
+		min_mass = PROTOTYPES[3].mass;
 	}
 
 	// cell size is equal to the maximum sphere radius * 2
@@ -119,9 +124,9 @@ void PhysicsEngine::initEnvironment() {
 	// environment parameters 
 	env_.drag = DRAG;
 	env_.gravity = make_float3(0.0f, -GRAVITY, 0.0f);
-	env_.stiffness = STIFFNESS;
-	env_.damping = DAMPING;
-	env_.friction = FRICTION;
+	env_.stiffness = STIFFNESS * min_mass;
+	env_.damping = DAMPING * min_mass;
+	env_.friction = FRICTION * min_mass;
 }
 
 void PhysicsEngine::initSpheres() {
@@ -205,7 +210,7 @@ void PhysicsEngine::releaseMemory() {
 
 	if (gpu_mode_) {
 		freeArray(d_velo_);
-		freeArray(d_velo_delta_);
+		freeArray(d_accel_);
 		freeArray(d_pos_);
 		freeArray(d_type_);
 		freeArray(d_hash_);
@@ -214,7 +219,7 @@ void PhysicsEngine::releaseMemory() {
 		freeArray(d_cell_end_);
 	} 
 	else {
-		delete[] h_velo_delta_;
+		delete[] h_accel_;
 		delete[] h_hash_;
 		delete[] h_index_sorted_;
 		delete[] h_cell_start_;
@@ -240,7 +245,7 @@ void PhysicsEngine::update(float elapse) {
 		dSimulateFast(
 			d_pos_,
 			d_velo_,
-			d_velo_delta_,
+			d_accel_,
 			d_type_,
 			d_hash_,
 			d_index_sorted_,
@@ -255,7 +260,7 @@ void PhysicsEngine::update(float elapse) {
 			hSimulateBrutal(
 				h_pos_,
 				h_velo_,
-				h_velo_delta_,
+				h_accel_,
 				h_type_,
 				elapse);
 		}
@@ -263,7 +268,7 @@ void PhysicsEngine::update(float elapse) {
 			hSimulateFast(
 				h_pos_,
 				h_velo_,
-				h_velo_delta_,
+				h_accel_,
 				h_type_,
 				h_hash_,
 				h_index_sorted_,

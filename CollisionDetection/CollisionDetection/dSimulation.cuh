@@ -19,7 +19,7 @@ extern "C"
     void copyHost2Device(void *device, const void *host, int offset, int size);
 
     void dSetupSimulation(SimulationEnv *h_env, SimulationSphereProto *h_protos);
-	void dSimulateFast(float *pos_s, float *velo_s, float *velo_delta_s, uint *types, 
+	void dSimulateFast(float *pos_s, float *velo_s, float *accel_s, uint *types, 
 		uint *hashes, uint *indices, uint *cell_start, uint *cell_end, float elapse, uint sphere_num, uint max_hash_value);
 }
 
