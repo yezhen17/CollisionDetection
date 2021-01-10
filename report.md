@@ -2,9 +2,14 @@
 
 2017013599 软件71 从业臻
 
-### 
+
 
 ### 算法说明
+
+算法设计基本参考了：
+
+- https://developer.nvidia.com/gpugems/gpugems3/part-v-physics-simulation/chapter-32-broad-phase-collision-detection-cuda
+- https://developer.download.nvidia.com/assets/cuda/files/particles.pdf
 
 碰撞检测可以分为broad-phase和narrow-phase。broad-phase的作用是消耗较少的时间来排除一些显然的不可能碰撞的物体对。
 
@@ -16,12 +21,12 @@ broad-phase的思路就是将空间划分为小块，对于特殊设计的块来
 
 然而，怎么找到这至多$C$个物体才决定了复杂度的大小。若将空间看成一个个块，可以给每个物体根据其所处块的位置计算一个哈希值，再根据哈希值排序，以排序后的索引为依据寻找处于同一块（或者近邻块）的物体。最简单的哈希函数就是$z\times HASH\_BLOCK^2+y\times HASH\_BLOCK + x$，其中$x,y,z$是所处块分别在三个维度上的序数，$HASH\_BLOCK$是一个预设的$2$的指数。实际实现中，令$HASH\_BLOCK=64$比较合适，因为$64^3>2\times 20^6$，足以为每个块赋予一个唯一的哈希值，并且内存开销也可以接受。在此思路下，将算法拆解为如下步骤：
 
-- 为每个物体计算哈希值（$O(n)$）
-- 根据哈希值排序（由哈希函数特点，使用基数排序，复杂度$O(n)$）
-- 排序后，哈希值从小到大排列，由一段段连续的相等值构成，我们需要找到这些“相等值”的开始处和结束处，亦即一个块的开始处和结束处
+- 为每个物体计算哈希值（复杂度$O(n)$）
+- 根据哈希值排序（由哈希函数特点，使用基数排序，复杂度$O(nd)$，$d$是哈希值最大位数）
+- 排序后，哈希值从小到大排列，由一段段连续的相等值构成，我们需要找到这些“相等值”的开始处和结束处，亦即一个块的开始处和结束处（复杂度$O(n)$）
 - 有了上一步的信息，就可以遍历所有物体，对每个物体遍历其所处块+相邻块的物体，检测是否发生碰撞，如有则按照公式计算更新（复杂度$O(n)$）
 
-综上这个算法实际的复杂度大约是：
+综上这个算法实际的复杂度大约是：$O(n)$，因为哈希函数的设计，避免了$O(nlogn)$，不过常数项应该非常大。
 
 
 
@@ -39,7 +44,7 @@ broad-phase的思路就是将空间划分为小块，对于特殊设计的块来
 
 画出取对数后的图（横轴是球数除以10再取对数），整体看比较接近于线性的复杂度。
 
-![cpufast](C:\Users\13731\Dropbox\My PC (LAPTOP-VJ2F61DB)\Desktop\cpufast.png)
+![cpufast](images\cpufast.png)
 
 然后是GPU上并行实现该算法的表现：
 
@@ -49,13 +54,13 @@ broad-phase的思路就是将空间划分为小块，对于特殊设计的块来
 
 画出取对数后的图（横轴是球数除以10再取对数），可以看出在大约是两段折线，前一段是球数小于1000，后一段是大于1000，这应该和我电脑CUDA设备（GTX 1050）本身的性质和我设置的`num_threads=256`有一定的关系。前一段线程数较小，增加线程几乎不增加时间开销；但线程数增多后，线程的管理也就更加复杂。
 
-![gpufast](C:\Users\13731\Dropbox\My PC (LAPTOP-VJ2F61DB)\Desktop\gpufast.png)
+![gpufast](images\gpufast.png)
 
 把两张图放在一起：
 
-![fast](C:\Users\13731\Dropbox\My PC (LAPTOP-VJ2F61DB)\Desktop\fast.png)
+![fast](images\fast.png)
 
-很明显，GPU上并行化的程序复杂度的系数比CPU上串行的程序的要小的多。
+很明显，GPU上并行化的程序复杂度的常数项比CPU上串行的程序的要小的多。
 
 最后，也列出了暴力算法（$O(n^2)$）的表现：
 
@@ -65,7 +70,7 @@ broad-phase的思路就是将空间划分为小块，对于特殊设计的块来
 
 画出取对数后的曲线（横轴是球数平方除以100再取对数），验证了复杂度。
 
-![brutal](C:\Users\13731\Dropbox\My PC (LAPTOP-VJ2F61DB)\Desktop\brutal.png)
+![brutal](images\brutal.png)
 
 
 

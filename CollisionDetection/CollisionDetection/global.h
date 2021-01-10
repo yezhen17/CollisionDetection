@@ -35,19 +35,20 @@ const bool BRUTAL_MODE = false; // if use CPU mode, whether use brutal-force alg
 const bool IMMERSIVE_MODE = false; // whether hide the cursor
 const bool USE_SPOTLIGHT = false; // whether use spotlight (disable for less computation)
 
-// environment related
+// environment related, PLEASE do not modify these
 const float DRAG = 0.9999f;
 const float GRAVITY = 0.2f;
 const float STIFFNESS = 1000.0f;
 const float DAMPING = 8.0f;
 const float FRICTION = 0.03f;
+const float SIMULATION_TIMESTEP = 0.02f; // time elapsed in one "update"
 
 // ---------------------------------------------------------------------------------------
 
 // can be modified by user
 // ---------------------------------------------------------------------------------------
 
-const uint SPHERE_NUM_DEFAULT = 8000;
+const uint SPHERE_NUM_DEFAULT = 30;
 
 const bool RENDER_MODE_DEFAULT = true;
 const bool GPU_MODE_DEFAULT = true;

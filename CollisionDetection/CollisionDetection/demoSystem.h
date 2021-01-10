@@ -23,6 +23,7 @@ public:
 		bool gpu_mode,
 		bool use_spotlight = USE_SPOTLIGHT,
 		bool immersive_mode_ = IMMERSIVE_MODE,
+		float simulation_timestep = SIMULATION_TIMESTEP,
 		uint simulation_step = SIMULATION_STEP,
 		uint frame_rate = FRAME_RATE, 
 		glm::vec3 origin = glm::vec3(0.0f, 0.0f, 0.0f),
