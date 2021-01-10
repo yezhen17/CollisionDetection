@@ -27,9 +27,9 @@ const uint WINDOW_WIDTH = 800;
 const uint WINDOW_HEIGHT = 800;
 
 const uint FRAME_RATE = 50; // how many rendering frames each second
-const uint SIMULATION_STEP = 5; // how many steps to execute each rendering frame
+const uint SIMULATION_STEP = 3; // how many steps to execute each rendering frame
 
-const bool VERBOSE = true; // whether remind user the frame rate is too high
+const bool VERBOSE = false; // whether remind user the frame rate is too high
 
 const bool BRUTAL_MODE = false; // if use CPU mode, whether use brutal-force algorithm
 const bool IMMERSIVE_MODE = false; // whether hide the cursor
